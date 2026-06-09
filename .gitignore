@@ -1,0 +1,16 @@
+.env
+configs/database.yaml
+configs/data.yaml
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+data/processed/
+artifacts/
+reports/*.json
+*.log
+*.pkl
+*.pt

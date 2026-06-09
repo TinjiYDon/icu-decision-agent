@@ -1,0 +1,18 @@
+# 首个训练标签（已确认）
+primary:
+  name: mortality_12h
+  horizon_hours: 12
+  event: icu_death   # 未来 horizon 内 ICU/院内死亡，定义在 domain/labels 实现
+
+horizons_hours: [4, 8, 12, 24]
+
+split:
+  train: 0.7
+  val: 0.1
+  test: 0.2
+  by: stay_id
+
+recommend:
+  observe: 0.2
+  recheck: 0.4
+  monitor: 0.7

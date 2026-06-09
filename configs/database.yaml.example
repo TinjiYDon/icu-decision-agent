@@ -1,0 +1,11 @@
+# PostgreSQL（复制为 configs/database.yaml）
+database:
+  url: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/icu_decision"
+  pool_size: 5
+
+layer0:
+  mimic_source: demo
+  demo_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_demo"
+  full_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv"
+  waveform_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_waveform"
+  ecg_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_ecg"

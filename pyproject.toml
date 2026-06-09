@@ -1,0 +1,36 @@
+[project]
+name = "icu-decision"
+version = "0.1.0"
+description = "ICU deterioration warning agent (LightGBM + GRU-D/TFT)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "alembic>=1.13",
+    "polars>=1.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "lightgbm>=4.3",
+    "scikit-learn>=1.4",
+    "shap>=0.45",
+    "torch>=2.2",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "streamlit>=1.32",
+    "plotly>=5.20",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["infra*", "data_access*", "domain*", "application*", "presentation*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
