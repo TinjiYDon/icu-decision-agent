@@ -1,9 +1,14 @@
-def test_etl_mock():
+def test_etl_smoke():
     from application.etl_pipeline import run_etl
+    from infra.config import get_data_source
 
     r = run_etl()
-    assert r["status"] == "mock_ok"
-    assert r["mock_icustays"] >= 1
+    if get_data_source() == "mock":
+        assert r["status"] == "mock_ok"
+    else:
+        assert r["status"] == "mimic_ok"
+    assert r["staging_icustays"] >= 1
+    assert r["icustays"] == r["staging_icustays"]
 
 
 def test_config_phase():

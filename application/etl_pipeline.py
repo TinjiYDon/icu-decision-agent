@@ -1,4 +1,4 @@
-"""P0 ETL entry (stub until MIMIC Layer0 ready)."""
+"""P0 ETL entry — Layer0/mock → staging + feat."""
 
 from __future__ import annotations
 
@@ -6,19 +6,18 @@ from infra.config import get_data_phase, get_data_source, get_mimic_source
 
 
 def run_etl() -> dict:
-    """Run ETL pipeline. Full impl after MIMIC import."""
-    meta = {
+    source = get_data_source()
+    meta: dict = {
         "phase": get_data_phase(),
-        "source": get_data_source(),
-        "mimic_source": get_mimic_source() if get_data_source() == "mimic" else None,
-        "status": "stub",
-        "message": "MIMIC Layer0 not ready; implement domain/etl after import",
+        "source": source,
+        "mimic_source": get_mimic_source() if source == "mimic" else None,
     }
-    if get_data_source() == "mock":
-        from data_access.mimic_repo import count_icustays
+    from domain.etl.pipeline import run_pipeline
 
-        meta["mock_icustays"] = count_icustays()
-        meta["status"] = "mock_ok"
+    stats = run_pipeline()
+    meta.update(stats)
+    meta["icustays"] = stats["staging_icustays"]
+    meta["status"] = "mimic_ok" if source == "mimic" else "mock_ok"
     return meta
 
 

@@ -6,7 +6,7 @@
 
 - 架构与数据层：见团队文档 `docs/ARCHITECTURE.md`（或向负责人索取 `SPEC.md`）
 - **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：`docs/TEAM_RESTORE.md`
+- **队友恢复 dump**：上级 [`../TEAM_DATA.md`](../TEAM_DATA.md)
 
 ## 模型路线
 

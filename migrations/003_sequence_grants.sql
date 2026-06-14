@@ -1,0 +1,3 @@
+-- Fix icu_dev sequence privileges (INSERT into SERIAL tables)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA model TO icu_dev;
+ALTER DEFAULT PRIVILEGES IN SCHEMA model GRANT USAGE, SELECT ON SEQUENCES TO icu_dev;

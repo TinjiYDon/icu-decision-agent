@@ -1,39 +1,26 @@
 # 项目二 · 状态摘要
 
-> 完整团队日志见上级目录 `../PROJECT_STATUS.md`（ monorepo 工作区）  
-> **MIMIC**：下载中 · **阶段**：P0 · **阻塞**：Layer0 导入后实现完整 ETL
+> 团队总览：[`../PROJECT_STATUS.md`](../PROJECT_STATUS.md)
 
-## 仓库
+## P0 进度（Demo）
 
-- 本项目：`icu-decision-agent`
-- 调度项目：`icu-scheduling-agent`（独立仓库）
+| 项 | 状态 |
+|----|------|
+| ETL staging | ✓ 140 stays |
+| mortality_12h 标签 | ✓ 2 阳性 / 140 |
+| LightGBM | ✓ `artifacts/models/lgbm_mortality_12h.txt` |
+| Layer1 dump | ✓ `../dumps/icu_decision_layer1_schemas_*.dump` |
 
-## P0 目标
-
-ETL → 12h 死亡标签 → LightGBM → SHAP → Streamlit → Layer1 dump
-
-## 本地命令
+## 一键跑通
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-copy .env.example .env
-copy configs\database.yaml.example configs\database.yaml
-copy configs\data.yaml.example configs\data.yaml
 .\scripts\apply_migrations.ps1
-pytest tests/ -q
-python -m application.etl_pipeline
-streamlit run presentation/streamlit_app.py
+python -m application.run_p0
 ```
 
-## 队友 restore dump
+## 分步
 
-见仓库内 `docs/TEAM_RESTORE.md`（从 project-code 同步）
-
-## 代码待办（MIMIC 后）
-
-- [ ] `domain/etl` 完整 pipeline
-- [ ] `domain/labels/mortality_12h.py`
-- [ ] `domain/models/lgbm.py`
-- [ ] `domain/explain/shap.py`
-- [ ] Streamlit 联调
+```powershell
+python -m application.etl_pipeline
+python -m application.train
+```

@@ -1,4 +1,4 @@
-source: mock   # mock | mimic
+source: mimic   # mock | mimic — 队友 restore dump 后仍用 mimic
 phase: P0      # P0 | P1 | P2
 
 mock:
