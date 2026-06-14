@@ -6,7 +6,18 @@
 
 - 架构与数据层：见团队文档 `docs/ARCHITECTURE.md`（或向负责人索取 `SPEC.md`）
 - **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：上级 [`../TEAM_DATA.md`](../TEAM_DATA.md)
+- **队友恢复 dump**：见下方「Docker + restore」
+
+## 队友：Docker + restore
+
+```powershell
+docker compose up -d
+# 网盘下载 dump 到 dumps/
+.\scripts\restore_layer1.ps1 -Target decision -DumpFile .\dumps\icu_decision_layer1_schemas_xxx.dump
+copy configs\data.yaml.example configs\data.yaml   # source: mimic
+pytest tests/ -q
+python -m application.run_p0   # 可选，已有 dump 可跳过训练
+```
 
 ## 模型路线
 

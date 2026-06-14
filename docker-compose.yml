@@ -1,0 +1,22 @@
+# P0 团队 PostgreSQL（不含 MIMIC 数据；Layer 1 通过 dump 网盘传递后 restore）
+#
+# 若本机已装 winget 版 PG 占 5432，改 ports 为 "5433:5432" 并在 .env 里改端口
+services:
+  postgres:
+    image: postgres:16
+    container_name: icu_pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - icu_pg_data:/var/lib/postgresql/data
+      - ./scripts/init_databases_p0.sql:/docker-entrypoint-initdb.d/01_init_p0.sql:ro
+      - ./scripts/docker_init_mock.sh:/docker-entrypoint-initdb.d/02_mock.sh:ro
+      - ./scripts/mock_schema_scheduling.sql:/scripts/mock_schema_scheduling.sql:ro
+      - ./scripts/mock_schema_decision.sql:/scripts/mock_schema_decision.sql:ro
+      - ./dumps:/dumps
+
+volumes:
+  icu_pg_data:

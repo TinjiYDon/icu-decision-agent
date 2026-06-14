@@ -1,0 +1,3 @@
+# 网盘传递的 dump 文件（勿提交 Git）
+*.dump
+DATA_VERSION_*.json
