@@ -1,6 +1,8 @@
 # ICU 临床恶化预警决策智能体
 
-独立开源项目 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent) · 数据库 `icu_decision`
+独立开源项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
+
+**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始
 
