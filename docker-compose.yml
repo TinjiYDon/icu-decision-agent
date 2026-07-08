@@ -1,6 +1,5 @@
-# P0 团队 PostgreSQL（不含 MIMIC 数据；Layer 1 通过 dump 网盘传递后 restore）
-#
-# 默认 5433，避免与本机 PG16(5432) 及调度库容器冲突
+# PostgreSQL for icu_decision (no MIMIC data; restore Layer1 from dumps/)
+# Default port 5433 to avoid conflict with host PG on 5432
 services:
   postgres:
     image: postgres:16
@@ -14,7 +13,6 @@ services:
       - icu_decision_pg_data:/var/lib/postgresql/data
       - ./scripts/init_databases_p0.sql:/docker-entrypoint-initdb.d/01_init_p0.sql:ro
       - ./scripts/docker_init_mock.sh:/docker-entrypoint-initdb.d/02_mock.sh:ro
-      - ./scripts/mock_schema_scheduling.sql:/scripts/mock_schema_scheduling.sql:ro
       - ./scripts/mock_schema_decision.sql:/scripts/mock_schema_decision.sql:ro
       - ./dumps:/dumps
 

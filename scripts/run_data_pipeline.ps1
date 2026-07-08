@@ -1,10 +1,9 @@
-# ETL → 导出 Layer1 dump → 冒烟测试（不含模型训练/仿真）
-# 用法：.\scripts\run_data_pipeline.ps1
+# ETL → export Layer1 dump → smoke tests (stops before model training)
 param(
     [switch]$SkipEtl,
     [switch]$SkipExport,
     [switch]$SkipTests,
-    [string]$DumpMirrorDir = "d:\project\_local-data\mimic"
+    [string]$DumpMirrorDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,21 +23,22 @@ if (-not $SkipEtl) {
 }
 
 if (-not $SkipExport) {
-    Write-Host "=== export Layer1 dump (schemas + ETL data) ==="
-    & (Join-Path $PSScriptRoot "export_layer1.ps1") -Target decision -SchemasOnly -MimicSource mimic
-    if ($DumpMirrorDir) {
-        New-Item -ItemType Directory -Force -Path $DumpMirrorDir | Out-Null
+    Write-Host "=== export Layer1 dump ==="
+    & (Join-Path $PSScriptRoot "export_layer1.ps1") -SchemasOnly -MimicSource mimic
+    $mirror = if ($DumpMirrorDir) { $DumpMirrorDir } elseif ($env:LOCAL_DATA_MIRROR) { $env:LOCAL_DATA_MIRROR } else { "" }
+    if ($mirror) {
+        New-Item -ItemType Directory -Force -Path $mirror | Out-Null
         Get-ChildItem (Join-Path $root "dumps") -Filter "icu_decision_P0-etl_*.dump" |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1 |
-            ForEach-Object { Copy-Item $_.FullName $DumpMirrorDir -Force; Write-Host "Mirrored: $($_.Name)" }
+            ForEach-Object { Copy-Item $_.FullName $mirror -Force; Write-Host "Mirrored: $($_.Name) -> $mirror" }
     }
 }
 
 if (-not $SkipTests) {
-    Write-Host "=== pytest (smoke/db/etl — no train) ==="
+    Write-Host "=== pytest (smoke/db/etl) ==="
     & $py -m pytest tests/test_smoke.py tests/test_db.py tests/test_etl.py -q
     if ($LASTEXITCODE -ne 0) { throw "pytest failed" }
 }
 
 Write-Host ""
-Write-Host "CHECKPOINT OK: ETL + dump + smoke. Next: python -m application.run_p0 (model stage)"
+Write-Host "CHECKPOINT OK: ETL + dump + smoke. Next: python -m application.train"

@@ -1,9 +1,6 @@
-# 从 _local-data/mimic 的 Layer1 dump 恢复 → 跑 ETL（dump/ETL 数据均不入 GitHub）
-# 用法：
-#   .\scripts\bootstrap_from_dump.ps1
-#   .\scripts\bootstrap_from_dump.ps1 -MimicSource demo -SkipRestore
+# Restore dump → optional ETL (dump data not in GitHub)
 param(
-    [string]$DumpFile = "d:\project\_local-data\mimic\icu_decision_P0-etl_mimic_94458stays_20260708.dump",
+    [string]$DumpFile = "",
     [ValidateSet("demo", "full", "mimic")]
     [string]$MimicSource = "demo",
     [switch]$SkipRestore,
@@ -17,12 +14,15 @@ $root = Split-Path $PSScriptRoot -Parent
 $py = Join-Path $root ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) { $py = "python" }
 
+if (-not $DumpFile) {
+    $latest = Get-ChildItem (Join-Path $root "dumps") -Filter "icu_decision_P0-etl_*.dump" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($latest) { $DumpFile = $latest.FullName }
+    else { throw "No dump in dumps/. Pass -DumpFile or run export_layer1.ps1 first." }
+}
+
 if (-not $SkipRestore) {
-    & (Join-Path $PSScriptRoot "restore_layer1.ps1") `
-        -Target decision `
-        -DumpFile $DumpFile `
-        -PgHost $PgHost `
-        -PgPort $PgPort
+    & (Join-Path $PSScriptRoot "restore_layer1.ps1") -DumpFile $DumpFile -PgHost $PgHost -PgPort $PgPort
 }
 
 $dataYaml = Join-Path $root "configs\data.yaml"
@@ -35,7 +35,6 @@ if (-not (Test-Path $dbYaml)) {
 }
 
 Write-Host "Layer0 mimic_source -> $MimicSource (edit configs/database.yaml if needed)"
-Write-Host "data.yaml source should be: mimic"
 
 if (-not $SkipEtl) {
     $env:PYTHONPATH = $root

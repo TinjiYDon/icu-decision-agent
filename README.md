@@ -1,36 +1,43 @@
 # ICU 临床恶化预警决策智能体
 
-仓库：[icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent) · 数据库：`icu_decision`
+独立开源项目 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent) · 数据库 `icu_decision`
+
+## 快速开始
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\pip install -e ".[dev]"
+copy configs\database.yaml.example configs\database.yaml
+copy configs\data.yaml.example configs\data.yaml
+.\scripts\apply_migrations.ps1
+$env:PYTHONPATH = (Get-Location)
+.\scripts\run_data_pipeline.ps1   # 数据检查点：ETL + dump + 冒烟
+```
 
 ## 文档
 
-**从 [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) 开始。**
-
 | 文档 | 说明 |
 |------|------|
-| [docs/README.md](docs/README.md) | 文档索引 |
-| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | dump / MIMIC 本地约定 |
+| [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
+| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | MIMIC / dump 本地配置 |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
-
-## 当前阶段
-
-**数据检查点已完成**（ETL 94,458 stays + dump + 冒烟）。模型训练为下一步。
-
-```powershell
-$env:PYTHONPATH = (Get-Location)
-.\scripts\run_data_pipeline.ps1   # 重现数据检查点
-python -m application.train       # 模型阶段
-```
+| [docs/README.md](docs/README.md) | 文档索引 |
 
 ## 架构
 
 ```
-Layer0 mimic → ETL → staging/feat → LightGBM + SHAP → Streamlit
-L5 → L4 application → L3 domain → L2 data_access → L1 infra → PostgreSQL
+MIMIC (Layer0) → ETL → staging/feat → LightGBM + SHAP → Streamlit
 ```
 
-## Docker（队友）
+## Docker（可选）
 
 ```powershell
-docker compose up -d   # PG 端口 5433
+docker compose up -d   # PostgreSQL 端口 5433
+```
+
+## 模型阶段（数据检查点之后）
+
+```powershell
+python -m application.train
+python -m application.run_p0
 ```

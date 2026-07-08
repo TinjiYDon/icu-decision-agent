@@ -1,7 +1,9 @@
-# 项目二：ICU 临床恶化预警决策智能体
+# ICU 临床恶化预警决策智能体
 
-> 目录：`icu-decision/` · 仓库：`icu-decision-agent`  
-> 数据库：`icu_decision`（PostgreSQL 16，独立实例）
+> 仓库：`icu-decision-agent`  
+> 数据库：`icu_decision`（PostgreSQL 16）
+
+本仓库**独立运行**：自带 ETL、模型与演示，不依赖其他 ICU 项目或共享 MCP 服务。
 
 ---
 
@@ -14,7 +16,7 @@
 
 **不做什么**
 
-- 不调用项目一，不读 `icu_scheduling` 库。
+- 不依赖其他 ICU 项目的数据库、API 或 MCP 服务。
 
 **模型路线（并行）**
 

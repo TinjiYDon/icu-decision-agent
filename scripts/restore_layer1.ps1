@@ -1,10 +1,6 @@
-# Layer 1 恢复（dump 默认在 _local-data/mimic，勿提交 GitHub）
-# 用法：
-#   .\restore_layer1.ps1 -Target decision -DumpFile d:\project\_local-data\mimic\icu_decision_layer1_schemas_xxx.dump
+# Restore Layer1 dump into icu_decision
+# Usage: .\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_P0-etl_*.dump
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateSet("decision", "scheduling")]
-    [string]$Target,
     [Parameter(Mandatory = $true)]
     [string]$DumpFile,
     [string]$PgHost = "localhost",
@@ -16,8 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $DumpFile)) { throw "Dump not found: $DumpFile" }
 
-$db = if ($Target -eq "decision") { "icu_decision" } else { "icu_scheduling" }
-
+$db = "icu_decision"
 $pgRestore = "pg_restore"
 if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe") {
     $pgRestore = "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe"
@@ -26,5 +21,5 @@ if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe") {
 $env:PGPASSWORD = $PgPassword
 Write-Host "Restoring $DumpFile -> $db on ${PgHost}:${PgPort}"
 & $pgRestore -h $PgHost -p $PgPort -U $PgUser -d $db --clean --if-exists --no-owner --role=icu_dev $DumpFile
-Write-Host "OK. Set configs/data.yaml source to mimic (or keep mock for UI-only)."
+Write-Host "OK. Ensure configs/data.yaml has source: mimic"
 Write-Host "Connection: icu_dev/icu_dev @ ${PgHost}:${PgPort}/$db"

@@ -1,4 +1,4 @@
--- Layer 1 schema（P0）项目二 icu_decision
+-- Layer 1 schema (P0) for icu_decision
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS feat;
 CREATE SCHEMA IF NOT EXISTS label;
