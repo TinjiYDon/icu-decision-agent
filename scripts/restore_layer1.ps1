@@ -1,7 +1,6 @@
-# Layer 1 恢复（队友执行，dump 从网盘下载到 project-code/dumps/）
+# Layer 1 恢复（dump 默认在 _local-data/mimic，勿提交 GitHub）
 # 用法：
-#   docker compose up -d
-#   .\restore_layer1.ps1 -Target decision -DumpFile .\dumps\icu_decision_layer1_schemas_xxx.dump
+#   .\restore_layer1.ps1 -Target decision -DumpFile d:\project\_local-data\mimic\icu_decision_layer1_schemas_xxx.dump
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("decision", "scheduling")]

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / "configs"
 
 DataSource = Literal["mock", "mimic"]
-MimicSource = Literal["demo", "full"]
+MimicSource = Literal["demo", "full", "mimic"]
 DataPhase = Literal["P0", "P1", "P2"]
 
 
@@ -58,5 +58,6 @@ def get_mimic_source() -> MimicSource:
 
 def get_layer0_dsn() -> str | None:
     layer0 = load_yaml("database.yaml").get("layer0", {})
-    key = "demo_dsn" if get_mimic_source() == "demo" else "full_dsn"
+    source = get_mimic_source()
+    key = {"demo": "demo_dsn", "full": "full_dsn", "mimic": "mimic_dsn"}.get(source, "demo_dsn")
     return layer0.get(key)

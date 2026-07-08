@@ -4,8 +4,9 @@ database:
   pool_size: 5
 
 layer0:
-  mimic_source: demo
+  mimic_source: demo   # demo | full | mimic（mimic = 本地 _local-data/mimic 导入库）
   demo_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_demo"
   full_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv"
+  mimic_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic"
   waveform_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_waveform"
   ecg_dsn: "postgresql+psycopg://icu_dev:CHANGE_ME@localhost:5432/mimic_iv_ecg"

@@ -10,7 +10,9 @@ param(
     [string]$PgHost = "localhost",
     [int]$PgPort = 5432,
     [string]$PgUser = "postgres",
-    [string]$PgPassword = "postgres"
+    [string]$PgPassword = "postgres",
+    [string]$MimicSource = "mimic",
+    [string]$Phase = "P0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,24 +21,44 @@ if (-not $OutDir) { $OutDir = Join-Path $root "dumps" }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $pgDump = "pg_dump"
+$psql = "psql"
 if (Test-Path "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe") {
     $pgDump = "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe"
+    $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
 }
 
 $env:PGPASSWORD = $PgPassword
+$dateTag = Get-Date -Format "yyyyMMdd"
 $version = Get-Date -Format "yyyyMMdd_HHmm"
+
+function Get-StayCount {
+    param([string]$DbName)
+    $n = & $psql -h $PgHost -p $PgPort -U $PgUser -d $DbName -t -A -c "SELECT COUNT(*) FROM staging.icustays;" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $n) { return 0 }
+    return [int]$n.Trim()
+}
+
+function Get-DumpFileName {
+    param([string]$DbName, [int]$StayCount)
+    $kind = if ($SchemasOnly) { "etl" } else { "full" }
+    if ($StayCount -le 0 -and $SchemasOnly) { $kind = "schema-only" }
+    return "${DbName}_${Phase}-${kind}_${MimicSource}_${StayCount}stays_${dateTag}.dump"
+}
 $meta = @{
-    version      = $version
-    p0_layer0    = @("mimic_iv_demo", "mimic_iv")
-    target       = $Target
-    schemas_only = [bool]$SchemasOnly
-    exported_at  = (Get-Date).ToString("o")
+    version       = $version
+    phase         = $Phase
+    p0_layer0     = @("mimic_iv_demo", "mimic_iv", "mimic")
+    mimic_source  = $MimicSource
+    target        = $Target
+    schemas_only  = [bool]$SchemasOnly
+    naming_format = "{db}_{phase}-etl_{mimic}_{N}stays_{date}.dump"
+    exported_at   = (Get-Date).ToString("o")
 }
 
 function Export-Db {
     param([string]$DbName, [string[]]$Schemas)
-    $suffix = if ($SchemasOnly) { "_layer1_schemas" } else { "_layer1_full" }
-    $out = Join-Path $OutDir "${DbName}${suffix}_${version}.dump"
+    $stayCount = Get-StayCount -DbName $DbName
+    $out = Join-Path $OutDir (Get-DumpFileName -DbName $DbName -StayCount $stayCount)
     $pgArgs = @("-h", $PgHost, "-p", "$PgPort", "-U", $PgUser, "-Fc", "-f", $out)
     if ($SchemasOnly) {
         foreach ($s in $Schemas) {

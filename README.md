@@ -1,43 +1,36 @@
 # ICU 临床恶化预警决策智能体
 
-项目二 · 仓库 `icu-decision-agent` · PostgreSQL `icu_decision`
+仓库：[icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent) · 数据库：`icu_decision`
 
-## 方案与状态
+## 文档
 
-- 架构与数据层：见团队文档 `docs/ARCHITECTURE.md`（或向负责人索取 `SPEC.md`）
-- **当前进度**：`docs/STATUS.md`
-- **队友恢复 dump**：见下方「Docker + restore」
+**从 [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) 开始。**
 
-## 队友：Docker + restore
+| 文档 | 说明 |
+|------|------|
+| [docs/README.md](docs/README.md) | 文档索引 |
+| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | dump / MIMIC 本地约定 |
+| [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
 
-```powershell
-docker compose up -d
-# 网盘下载 dump 到 dumps/
-.\scripts\restore_layer1.ps1 -Target decision -DumpFile .\dumps\icu_decision_layer1_schemas_xxx.dump
-copy configs\data.yaml.example configs\data.yaml   # source: mimic
-pytest tests/ -q
-python -m application.run_p0   # 可选，已有 dump 可跳过训练
-```
+## 当前阶段
 
-## 模型路线
-
-- **P0**：LightGBM + Isotonic + SHAP（表格特征，标签 12h 内死亡）
-- **P1+**：GRU-D → TFT（时序/波形）
-
-## 快速开始
+**数据检查点已完成**（ETL 94,458 stays + dump + 冒烟）。模型训练为下一步。
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-copy .env.example .env
-copy configs\database.yaml.example configs\database.yaml
-copy configs\data.yaml.example configs\data.yaml
-.\scripts\apply_migrations.ps1
-pytest tests/ -q
-python -m application.etl_pipeline
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+.\scripts\run_data_pipeline.ps1   # 重现数据检查点
+python -m application.train       # 模型阶段
 ```
 
 ## 架构
 
-L5 Streamlit → L4 application → L3 domain → L2 data_access → L1 infra → PostgreSQL
+```
+Layer0 mimic → ETL → staging/feat → LightGBM + SHAP → Streamlit
+L5 → L4 application → L3 domain → L2 data_access → L1 infra → PostgreSQL
+```
+
+## Docker（队友）
+
+```powershell
+docker compose up -d   # PG 端口 5433
+```

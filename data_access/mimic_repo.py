@@ -37,7 +37,9 @@ def count_icustays() -> int:
         with _mock_engine().connect() as conn:
             return conn.execute(text("SELECT COUNT(*) FROM mock.icustays")).scalar_one()
     with _read_engine().connect() as conn:
-        return conn.execute(text("SELECT COUNT(*) FROM mimiciv_icu.icustays")).scalar_one()
+        return conn.execute(
+            text("SELECT COUNT(DISTINCT stay_id) FROM mimiciv_icu.icustays")
+        ).scalar_one()
 
 
 def fetch_icustays() -> list[dict[str, Any]]:
@@ -55,11 +57,12 @@ def fetch_icustays() -> list[dict[str, Any]]:
         """
     else:
         sql = """
-            SELECT stay_id, subject_id, hadm_id,
+            SELECT DISTINCT ON (stay_id)
+                   stay_id, subject_id, hadm_id,
                    first_careunit, last_careunit,
                    intime, outtime, los AS los_hours
             FROM mimiciv_icu.icustays
-            ORDER BY stay_id
+            ORDER BY stay_id, intime
         """
     with _read_engine().connect() as conn:
         rows = conn.execute(text(sql)).mappings().all()
@@ -81,12 +84,13 @@ def fetch_cohort() -> list[dict[str, Any]]:
         """
     else:
         sql = """
-            SELECT i.stay_id, i.subject_id, i.hadm_id, i.intime, i.outtime, i.los AS los_hours,
+            SELECT DISTINCT ON (i.stay_id)
+                   i.stay_id, i.subject_id, i.hadm_id, i.intime, i.outtime, i.los AS los_hours,
                    p.anchor_age, p.gender, p.dod, a.hospital_expire_flag
             FROM mimiciv_icu.icustays i
             JOIN mimiciv_hosp.patients p ON i.subject_id = p.subject_id
             JOIN mimiciv_hosp.admissions a ON i.hadm_id = a.hadm_id
-            ORDER BY i.stay_id
+            ORDER BY i.stay_id, i.intime
         """
     with _read_engine().connect() as conn:
         rows = conn.execute(text(sql)).mappings().all()

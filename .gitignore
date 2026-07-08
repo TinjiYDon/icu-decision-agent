@@ -8,9 +8,14 @@ venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
-data/processed/
+data/
+data/**/*
+dumps/
+dumps/**/*
 artifacts/
-reports/*.json
+reports/
+reports/**/*
 *.log
 *.pkl
 *.pt
+*.dump

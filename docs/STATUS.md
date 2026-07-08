@@ -1,26 +1,28 @@
 # 项目二 · 状态摘要
 
-> 团队总览：[`../PROJECT_STATUS.md`](../PROJECT_STATUS.md)
+> 最后更新：2026-07-08
 
-## P0 进度（Demo）
+## 数据检查点（已完成）
 
 | 项 | 状态 |
 |----|------|
-| ETL staging | ✓ 140 stays |
-| mortality_12h 标签 | ✓ 2 阳性 / 140 |
-| LightGBM | ✓ `artifacts/models/lgbm_mortality_12h.txt` |
-| Layer1 dump | ✓ `../dumps/icu_decision_layer1_schemas_*.dump` |
+| Layer0 `mimic` 库 | ✓ P0 导入，94,458 icustays |
+| ETL staging | ✓ 94,458 |
+| dump 生产 | ✓ `icu_decision_P0-etl_mimic_94458stays_20260708.dump` |
+| 连通性 + 冒烟 | ✓ `run_data_pipeline.ps1` |
 
-## 一键跑通
+## 模型阶段（下一步）
+
+| 项 | 状态 |
+|----|------|
+| mortality_12h + LightGBM 全量 | 待跑 `application.train` |
+| Streamlit | 占位 |
+| MCP Tool | P2 规划 |
+
+## 命令
 
 ```powershell
-.\scripts\apply_migrations.ps1
-python -m application.run_p0
-```
-
-## 分步
-
-```powershell
-python -m application.etl_pipeline
-python -m application.train
+$env:PYTHONPATH = (Get-Location)
+.\scripts\run_data_pipeline.ps1    # 数据阶段
+python -m application.train        # 模型阶段
 ```
