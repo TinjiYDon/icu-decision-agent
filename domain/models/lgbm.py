@@ -93,6 +93,23 @@ def train_and_save() -> dict:
     return {"model_path": str(model_path), **metrics}
 
 
+_model_bundle: tuple[lgb.Booster, object] | None = None
+
+
+def _get_model_bundle() -> tuple[lgb.Booster, object]:
+    global _model_bundle
+    model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
+    if not model_path.exists():
+        raise FileNotFoundError(str(model_path))
+    if _model_bundle is None:
+        import shap
+
+        booster = lgb.Booster(model_file=str(model_path))
+        explainer = shap.TreeExplainer(booster)
+        _model_bundle = (booster, explainer)
+    return _model_bundle
+
+
 def _load_feature_row(stay_id: int) -> dict | None:
     engine = get_engine()
     with engine.connect() as conn:
@@ -131,10 +148,12 @@ def predict_stay(stay_id: int) -> dict:
 
     import shap
 
-    booster = lgb.Booster(model_file=str(model_path))
+    booster, explainer = _get_model_bundle()
     row = [[feat[c] for c in FEATURE_COLS]]
-    risk_score = float(booster.predict(row)[0])
-    explainer = shap.TreeExplainer(booster)
+    raw_score = float(booster.predict(row)[0])
+    # LGBM binary classifier: treat as probability when in [0,1], else raw logit label.
+    risk_score = raw_score if 0.0 <= raw_score <= 1.0 else raw_score
+    score_kind = "probability" if 0.0 <= raw_score <= 1.0 else "raw"
     shap_row = explainer.shap_values(row)
     values = shap_row[0] if isinstance(shap_row, list) else shap_row[0]
     pairs = sorted(zip(FEATURE_COLS, values), key=lambda x: abs(x[1]), reverse=True)
@@ -146,6 +165,7 @@ def predict_stay(stay_id: int) -> dict:
         "stay_id": stay_id,
         "status": "ok",
         "risk_score": round(risk_score, 4),
+        "score_kind": score_kind,
         "top_factors": top_factors,
         "features": feat,
     }

@@ -1,18 +1,17 @@
 import pandas as pd
 import streamlit as st
 
-from application.predict_patient import list_stays, predict_patient
-from infra.config import load_yaml
+from application.predict_patient import get_label_config, list_stays, predict_patient
 
 st.set_page_config(page_title="ICU Decision", layout="wide")
 st.title("ICU 临床恶化预警")
 st.caption("icu-decision-agent · LightGBM + SHAP · L4 `predict_patient`")
 
-labels = load_yaml("labels.yaml")
+labels = get_label_config()
 st.sidebar.subheader("标签配置")
 st.sidebar.json(labels.get("primary", {}))
 
-stays = list_stays(limit=500)
+stays = list(list_stays(limit=500))
 if not stays:
     st.warning("未找到 ICU stays。请先运行 ETL：`scripts/run_data_pipeline.ps1`")
     st.stop()
@@ -26,7 +25,12 @@ if st.button("计算 12h 恶化风险", type="primary"):
     if result.get("status") != "ok":
         st.error(result.get("message", result.get("status")))
     else:
-        st.metric("12h mortality risk (model score)", f"{result['risk_score']:.2%}")
+        score = result["risk_score"]
+        kind = result.get("score_kind", "raw")
+        if kind == "probability":
+            st.metric("12h mortality risk", f"{score:.2%}")
+        else:
+            st.metric("12h mortality model score (raw)", f"{score:.4f}")
         st.subheader("Top 影响因素 (SHAP)")
         st.dataframe(pd.DataFrame(result["top_factors"]), use_container_width=True)
         with st.expander("特征向量"):

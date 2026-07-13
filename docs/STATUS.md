@@ -22,14 +22,14 @@
 
 ## 成员 C 本阶段交付
 
-- `application/predict_patient.py`
-- `presentation/streamlit_app.py`
-- `domain/models/lgbm.py` · `predict_stay`（与 B 共用）
+- `application/predict_patient.py`（含 `get_label_config`、缓存 `list_stays`）
+- `presentation/streamlit_app.py`（概率/raw 分数展示）
+- `domain/models/lgbm.py` · `predict_stay` + SHAP 缓存（与 B 联调）
+
+## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\scripts\run_data_pipeline.ps1
-python -m application.train
+pytest tests/test_predict.py tests/test_smoke.py -q
 streamlit run presentation/streamlit_app.py
-pytest tests/test_predict.py -q
 ```

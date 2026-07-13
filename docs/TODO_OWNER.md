@@ -4,9 +4,9 @@
 
 | 任务 | 文件 | 状态 |
 |------|------|------|
-| L4 单患者预测 | `application/predict_patient.py` | ✅ |
-| L3 predict 接口 | `domain/models/lgbm.py` · `predict_stay` | ✅（与 B 联调） |
-| Streamlit 演示 | `presentation/streamlit_app.py` | ✅ 选 stay → 风险 + SHAP |
+| L4 单患者预测 | `application/predict_patient.py` | ✅ 缓存 list_stays + label config |
+| L3 predict 接口 | `domain/models/lgbm.py` · `predict_stay` | ✅ SHAP 缓存（与 B 联调） |
+| Streamlit 演示 | `presentation/streamlit_app.py` | ✅ 分数展示修正 |
 | 测试 | `tests/test_predict.py` | ✅ smoke |
 
 ## 待完成

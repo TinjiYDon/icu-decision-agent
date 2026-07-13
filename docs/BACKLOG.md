@@ -24,9 +24,8 @@
 ## S2 · 单患者预测
 
 - [x] **#S2-1** 成员 B：`domain/models/lgbm.py` · `predict_stay(stay_id)` ✅（C 联调落地）
-- [x] **#S2-2** 成员 C：`application/predict_patient.py` L4 编排 ✅
-  - 验证：`python -c "from application.predict_patient import predict_patient; print(predict_patient(1))"`
-  - 测试：`tests/test_predict.py`
+- [x] **#S2-2** 成员 C：`application/predict_patient.py` L4 + 缓存 ✅
+- [x] **#S2-2b** SHAP/booster 缓存、`score_kind` 展示（C 加固 ✅）
 
 ---
 
