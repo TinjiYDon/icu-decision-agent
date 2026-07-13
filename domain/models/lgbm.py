@@ -91,3 +91,61 @@ def train_and_save() -> dict:
         )
 
     return {"model_path": str(model_path), **metrics}
+
+
+def _load_feature_row(stay_id: int) -> dict | None:
+    engine = get_engine()
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT feature_json FROM feat.sample_matrix
+                WHERE stay_id = :stay_id AND hour_index = 0
+                """
+            ),
+            {"stay_id": stay_id},
+        ).mappings().first()
+    if not row:
+        return None
+    feat = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
+    return {c: feat.get(c, 0) for c in FEATURE_COLS}
+
+
+def predict_stay(stay_id: int) -> dict:
+    """L3: single-stay mortality risk score + SHAP top factors."""
+    model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
+    if not model_path.exists():
+        return {
+            "stay_id": stay_id,
+            "status": "no_model",
+            "message": "Run `python -m application.train` first.",
+        }
+
+    feat = _load_feature_row(stay_id)
+    if feat is None:
+        return {
+            "stay_id": stay_id,
+            "status": "no_features",
+            "message": "Stay not found in feat.sample_matrix; run ETL + build_features.",
+        }
+
+    import shap
+
+    booster = lgb.Booster(model_file=str(model_path))
+    row = [[feat[c] for c in FEATURE_COLS]]
+    risk_score = float(booster.predict(row)[0])
+    explainer = shap.TreeExplainer(booster)
+    shap_row = explainer.shap_values(row)
+    values = shap_row[0] if isinstance(shap_row, list) else shap_row[0]
+    pairs = sorted(zip(FEATURE_COLS, values), key=lambda x: abs(x[1]), reverse=True)
+    top_factors = [
+        {"feature": name, "value": feat[name], "shap": round(float(contrib), 4)}
+        for name, contrib in pairs[:4]
+    ]
+    return {
+        "stay_id": stay_id,
+        "status": "ok",
+        "risk_score": round(risk_score, 4),
+        "top_factors": top_factors,
+        "features": feat,
+    }

@@ -22,7 +22,7 @@ $env:PYTHONPATH = (Get-Location)
 |------|------|
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | MIMIC / dump 本地配置 |
-| [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
+| [docs/TODO_OWNER.md](docs/TODO_OWNER.md) | 成员 C 集成待办 |
 | [docs/README.md](docs/README.md) | 文档索引 |
 
 ## 架构
@@ -37,9 +37,10 @@ MIMIC (Layer0) → ETL → staging/feat → LightGBM + SHAP → Streamlit
 docker compose up -d   # PostgreSQL 端口 5433
 ```
 
-## 模型阶段（数据检查点之后）
+## 模型与演示
 
 ```powershell
 python -m application.train
-python -m application.run_p0
+streamlit run presentation/streamlit_app.py
 ```
+

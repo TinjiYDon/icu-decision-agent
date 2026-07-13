@@ -23,17 +23,17 @@
 
 ## S2 · 单患者预测
 
-- [ ] **#S2-1** 成员 B：`domain/models` 暴露 `predict(stay_id) -> score`  
-- [ ] **#S2-2** 成员 C：`application/predict_patient.py`（或扩展 train 模块）编排 L2→L3  
-  - 验证：固定 demo stay_id 输出可复现  
+- [x] **#S2-1** 成员 B：`domain/models/lgbm.py` · `predict_stay(stay_id)` ✅（C 联调落地）
+- [x] **#S2-2** 成员 C：`application/predict_patient.py` L4 编排 ✅
+  - 验证：`python -c "from application.predict_patient import predict_patient; print(predict_patient(1))"`
   - 测试：`tests/test_predict.py`
 
 ---
 
 ## S3 · Streamlit 演示
 
-- [ ] **#S3-1** 成员 C：`presentation/streamlit_app.py` 选 stay → 风险分 + Top 因素  
-  - 验证：`streamlit run presentation/streamlit_app.py`  
+- [x] **#S3-1** 成员 C：`presentation/streamlit_app.py` 选 stay → 风险分 + Top 因素 ✅
+  - 验证：`streamlit run presentation/streamlit_app.py`
   - 禁止：页面内 SQL / 直接 import domain
 
 ---

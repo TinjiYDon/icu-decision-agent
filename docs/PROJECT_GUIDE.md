@@ -37,12 +37,15 @@ $env:PYTHONPATH = (Get-Location)
 
 包含：环境检查 → ETL → 导出 `dumps/` → 冒烟测试。
 
-### 3. 模型阶段（下一步）
+### 3. 模型与演示（成员 C 骨架 ✅）
 
 ```powershell
 python -m application.train
 python -m application.run_p0
+streamlit run presentation/streamlit_app.py
 ```
+
+L4：`predict_patient(stay_id)` · `list_stays()` — 见 [`docs/TODO_OWNER.md`](TODO_OWNER.md)
 
 ### 从已有 dump 恢复（跳过 ETL）
 
@@ -60,7 +63,8 @@ python -m application.run_p0
 | ETL | `application/run_etl_stage.py` | **数据阶段终点** |
 | 导出 | `scripts/export_layer1.ps1` | 输出到 `dumps/` |
 | 冒烟 | `pytest tests/test_{smoke,db,etl}.py` | 不含训练 |
-| 模型 | `application/train` | 下一步 |
+| 模型 | `application/train` | B 主责 |
+| 演示 | `streamlit run presentation/streamlit_app.py` | C ✅ |
 
 ## dump 命名
 
@@ -78,7 +82,7 @@ python -m application.run_p0
 
 | 项 | 位置 |
 |----|------|
-| Streamlit 演示 | `presentation/streamlit_app.py` |
+| 训练指标 / AUC 写入 STATUS | B · `application.train` |
 | MCP Tool | `docs/INNOVATION_ROADMAP.md` P2 |
 | 时序模型 | P1+ `domain/models/` |
 
