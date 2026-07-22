@@ -1,8 +1,8 @@
 # Bugbot
 
-见工作区 `d:\project\docs\BUGBOT.md` 或：
-
 - [Integrations](https://cursor.com/dashboard?tab=integrations)
 - [Bugbot dashboard](https://cursor.com/dashboard/bugbot)
 
-为本仓 Enable 后，PR 评论 `cursor review` / `bugbot run`。
+**状态：✅ 已对本仓 Enable（2026-07-22）**
+
+PR 评论：`cursor review` / `bugbot run`。

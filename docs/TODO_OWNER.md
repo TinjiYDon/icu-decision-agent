@@ -16,7 +16,7 @@
 | MCP `predict_risk` | ✅ 骨架 · `python -m presentation.mcp_server` |
 | 时序模型 GRU-D/TFT | P1 · B 主责 |
 | STATUS 随训练指标更新 | 与 B 联调后填 AUC |
-| Bugbot | Dashboard Enable · `docs/BUGBOT.md` |
+| Bugbot | ✅ 已开 2026-07-22 · `docs/BUGBOT.md` |
 
 ## 验证
 

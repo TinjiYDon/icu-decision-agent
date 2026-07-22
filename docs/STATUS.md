@@ -20,7 +20,7 @@
 | Streamlit 选 stay + SHAP + 建议 | ✅ C |
 | MCP Tool `predict_risk` | ✅ C 骨架（`presentation/mcp_server.py`） |
 | PPO / RL | ❌ 不做（方案 C） |
-| Bugbot | ⏳ 见 `docs/BUGBOT.md`（Dashboard 待开） |
+| Bugbot | ✅ 已开（2026-07-22 · Dashboard Enable 三仓） |
 
 ## 成员 C 本阶段交付
 
