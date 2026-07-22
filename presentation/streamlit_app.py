@@ -31,9 +31,17 @@ if st.button("计算 12h 恶化风险", type="primary"):
             st.metric("12h mortality risk", f"{score:.2%}")
         else:
             st.metric("12h mortality model score (raw)", f"{score:.4f}")
+        rec = result.get("recommend") or {}
+        if rec:
+            st.info(f"建议档位：**{rec.get('label', rec.get('band'))}**（band=`{rec.get('band')}`）")
+            st.caption(f"阈值 observe/recheck/monitor = {rec.get('thresholds')}")
         st.subheader("Top 影响因素 (SHAP)")
         st.dataframe(pd.DataFrame(result["top_factors"]), use_container_width=True)
-        with st.expander("特征向量"):
+        with st.expander("特征向量与数据故事"):
+            st.markdown(
+                "- `anchor_age` 年龄 · `gender_m` 男性指示 · `los_hours` 已住 ICU 时长\n"
+                "- `hospital_expire_flag` **可能泄漏标签**（与院内死亡强相关），B 训练时应评估剔除"
+            )
             st.json(result.get("features", {}))
 
 st.divider()

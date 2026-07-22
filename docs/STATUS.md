@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-07-13
+> 更新：2026-07-22
 
 ## 数据检查点（已完成）
 
@@ -8,28 +8,29 @@
 |----|------|
 | Layer0 `mimic` | ✓ P0 核心表 |
 | ETL staging | ✓ 94,458 stays |
-| dump | ✓ `dumps/icu_decision_P0-etl_mimic_94458stays_20260708.dump` |
+| dump | ✓ 曾导出；本地若仅 schemas_only 见 `PARAM_STORY.md` |
 | 冒烟测试 | ✓ `run_data_pipeline.ps1` |
 
 ## 模型阶段
 
 | 项 | 状态 |
 |----|------|
-| mortality_12h + LightGBM | `application.train`（B 主责跑通 + 写 registry） |
-| L4 `predict_patient` | ✅ C 已完成 |
-| Streamlit 选 stay + SHAP | ✅ C 已完成 |
+| mortality_12h + LightGBM | `application.train`（B · Issue #3） |
+| L4 `predict_patient` + `recommend` 档位 | ✅ C |
+| Streamlit 选 stay + SHAP + 建议 | ✅ C |
 | MCP Tool | P2 规划 |
+| PPO / RL | ❌ 不做（方案 C） |
 
 ## 成员 C 本阶段交付
 
-- `application/predict_patient.py`（含 `get_label_config`、缓存 `list_stays`）
-- `presentation/streamlit_app.py`（概率/raw 分数展示）
-- `domain/models/lgbm.py` · `predict_stay` + SHAP 缓存（与 B 联调）
+- `predict_patient` / SHAP 缓存 / recommend 档位
+- `docs/PARAM_STORY.md` 参数故事
+- Streamlit 风险建议展示
 
 ## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-pytest tests/test_predict.py tests/test_smoke.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_predict.py tests/test_smoke.py -q
 streamlit run presentation/streamlit_app.py
 ```

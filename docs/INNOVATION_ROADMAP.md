@@ -23,5 +23,8 @@
 
 ## 当前重点
 
-1. Streamlit 单患者演示
-2. MCP Tool schema（输入 stay_id，输出 score + shap_factors）
+1. Streamlit 单患者演示 + 建议档位（方案 C）
+2. B：全量 train + AUC 写入 STATUS（Issue #3）
+3. MCP Tool schema（P2）
+4. **不做** online PPO；时序升级见 P3 GRU-D/TFT
+

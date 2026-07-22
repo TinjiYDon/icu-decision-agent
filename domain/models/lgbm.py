@@ -128,6 +128,37 @@ def _load_feature_row(stay_id: int) -> dict | None:
     return {c: feat.get(c, 0) for c in FEATURE_COLS}
 
 
+def recommend_action(risk_score: float, score_kind: str = "probability") -> dict:
+    """Map score to clinical band using configs/labels.yaml recommend thresholds.
+
+    Bands (probability scale): observe <0.2, recheck <0.4, monitor <0.7, escalate >=0.7.
+    Raw (non-probability) scores return band=unknown so UI does not over-claim.
+    """
+    cfg = load_yaml("labels.yaml").get("recommend", {})
+    observe = float(cfg.get("observe", 0.2))
+    recheck = float(cfg.get("recheck", 0.4))
+    monitor = float(cfg.get("monitor", 0.7))
+    if score_kind != "probability":
+        return {
+            "band": "unknown",
+            "label": "分数非概率，暂不分级",
+            "thresholds": {"observe": observe, "recheck": recheck, "monitor": monitor},
+        }
+    if risk_score < observe:
+        band, label = "observe", "观察（低风险）"
+    elif risk_score < recheck:
+        band, label = "recheck", "复查（中低风险）"
+    elif risk_score < monitor:
+        band, label = "monitor", "加强监护（中高风险）"
+    else:
+        band, label = "escalate", "升级处置（高风险）"
+    return {
+        "band": band,
+        "label": label,
+        "thresholds": {"observe": observe, "recheck": recheck, "monitor": monitor},
+    }
+
+
 def predict_stay(stay_id: int) -> dict:
     """L3: single-stay mortality risk score + SHAP top factors."""
     model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
@@ -145,8 +176,6 @@ def predict_stay(stay_id: int) -> dict:
             "status": "no_features",
             "message": "Stay not found in feat.sample_matrix; run ETL + build_features.",
         }
-
-    import shap
 
     booster, explainer = _get_model_bundle()
     row = [[feat[c] for c in FEATURE_COLS]]
@@ -166,6 +195,7 @@ def predict_stay(stay_id: int) -> dict:
         "status": "ok",
         "risk_score": round(risk_score, 4),
         "score_kind": score_kind,
+        "recommend": recommend_action(risk_score, score_kind),
         "top_factors": top_factors,
         "features": feat,
     }
