@@ -37,10 +37,10 @@
 
 ---
 
-## S4 · MCP（P2，可选）
+## S4 · MCP（P2）
 
-- [ ] **#S4-1** 成员 C：MCP server 包装 L4 `predict_risk`  
-- [ ] **#S4-2** 成员 B：JSON schema 文档写入 INNOVATION_ROADMAP
+- [x] **#S4-1** 成员 C：MCP server 包装 L4 `predict_risk`（骨架 ✅ 2026-07-22）  
+- [ ] **#S4-2** 成员 B：JSON schema 文档写入 INNOVATION_ROADMAP（可对照 `presentation/mcp_tools.py` PREDICT_RISK_SCHEMA）
 
 ---
 

@@ -18,19 +18,24 @@
 | mortality_12h + LightGBM | `application.train`（B · Issue #3） |
 | L4 `predict_patient` + `recommend` 档位 | ✅ C |
 | Streamlit 选 stay + SHAP + 建议 | ✅ C |
-| MCP Tool | P2 规划 |
+| MCP Tool `predict_risk` | ✅ C 骨架（`presentation/mcp_server.py`） |
 | PPO / RL | ❌ 不做（方案 C） |
+| Bugbot | ⏳ 见 `docs/BUGBOT.md`（Dashboard 待开） |
 
 ## 成员 C 本阶段交付
 
 - `predict_patient` / SHAP 缓存 / recommend 档位
 - `docs/PARAM_STORY.md` 参数故事
 - Streamlit 风险建议展示
+- MCP `predict_risk` 工具骨架（`presentation/mcp_tools.py` + `mcp_server.py`）
 
 ## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m pytest tests/test_predict.py tests/test_smoke.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_predict.py tests/test_smoke.py tests/test_mcp_predict.py -q
 streamlit run presentation/streamlit_app.py
+# MCP（可选）
+.\.venv\Scripts\pip.exe install "mcp>=1.0"
+.\.venv\Scripts\python.exe -m presentation.mcp_server
 ```

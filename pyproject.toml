@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
+mcp = ["mcp>=1.0"]
 
 [build-system]
 requires = ["setuptools>=69"]

@@ -25,6 +25,6 @@
 
 1. Streamlit 单患者演示 + 建议档位（方案 C）
 2. B：全量 train + AUC 写入 STATUS（Issue #3）
-3. MCP Tool schema（P2）
+3. MCP `predict_risk` 骨架已合（`presentation/mcp_tools.py`）；B 可补 schema 文档 `#S4-2`
 4. **不做** online PPO；时序升级见 P3 GRU-D/TFT
 
