@@ -78,7 +78,8 @@ def fetch_cohort() -> list[dict[str, Any]]:
                    i.intime, i.outtime,
                    EXTRACT(EPOCH FROM (COALESCE(i.outtime, i.intime) - i.intime)) / 3600.0 AS los_hours,
                    65 AS anchor_age, 'M'::text AS gender, NULL::date AS dod,
-                   0 AS hospital_expire_flag
+                   0 AS hospital_expire_flag,
+                   'MICU'::text AS first_careunit
             FROM mock.icustays i
             ORDER BY i.stay_id
         """
@@ -86,6 +87,7 @@ def fetch_cohort() -> list[dict[str, Any]]:
         sql = """
             SELECT DISTINCT ON (i.stay_id)
                    i.stay_id, i.subject_id, i.hadm_id, i.intime, i.outtime, i.los AS los_hours,
+                   i.first_careunit,
                    p.anchor_age, p.gender, p.dod, a.hospital_expire_flag
             FROM mimiciv_icu.icustays i
             JOIN mimiciv_hosp.patients p ON i.subject_id = p.subject_id

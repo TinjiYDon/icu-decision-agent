@@ -1,17 +1,53 @@
-"""Build tabular features from Layer0 cohort → feat.sample_matrix."""
+"""Build admission-time features → feat.sample_matrix (no outcome leak)."""
 
 from __future__ import annotations
 
 import json
+import re
 
 from sqlalchemy import text
 
 from data_access.mimic_repo import fetch_cohort
 from infra.db import get_engine
 
+FEATURE_COLS = [
+    "anchor_age",
+    "gender_m",
+    "careunit_micu",
+    "careunit_sicu",
+    "careunit_ccu",
+    "careunit_other",
+]
+
 
 def _gender_m(g: str | None) -> int:
     return 1 if (g or "").upper() == "M" else 0
+
+
+def _careunit_flags(name: str | None) -> dict[str, int]:
+    u = (name or "").upper()
+    micu = 1 if "MICU" in u or re.search(r"\bMICU\b", u) else 0
+    sicu = 1 if "SICU" in u else 0
+    ccu = 1 if re.search(r"\bCCU\b", u) or "CORONARY" in u else 0
+    if micu == 0 and sicu == 0 and ccu == 0:
+        other = 1
+    else:
+        other = 0
+    return {
+        "careunit_micu": micu,
+        "careunit_sicu": sicu,
+        "careunit_ccu": ccu,
+        "careunit_other": other,
+    }
+
+
+def row_to_features(row: dict) -> dict:
+    feat = {
+        "anchor_age": int(row.get("anchor_age") or 0),
+        "gender_m": _gender_m(row.get("gender")),
+    }
+    feat.update(_careunit_flags(row.get("first_careunit")))
+    return feat
 
 
 def build_features() -> dict:
@@ -20,14 +56,7 @@ def build_features() -> dict:
     with engine.begin() as conn:
         conn.execute(text("TRUNCATE feat.sample_matrix"))
         for row in rows:
-            age = int(row["anchor_age"] or 0)
-            los = float(row["los_hours"] or 0.0)
-            feat = {
-                "anchor_age": age,
-                "gender_m": _gender_m(row.get("gender")),
-                "los_hours": round(los, 3),
-                "hospital_expire_flag": int(row.get("hospital_expire_flag") or 0),
-            }
+            feat = row_to_features(row)
             conn.execute(
                 text(
                     """
@@ -40,4 +69,4 @@ def build_features() -> dict:
                     "feature_json": json.dumps(feat, ensure_ascii=False),
                 },
             )
-    return {"feat_rows": len(rows)}
+    return {"feat_rows": len(rows), "feature_cols": FEATURE_COLS}

@@ -39,8 +39,9 @@ if st.button("计算 12h 恶化风险", type="primary"):
         st.dataframe(pd.DataFrame(result["top_factors"]), use_container_width=True)
         with st.expander("特征向量与数据故事"):
             st.markdown(
-                "- `anchor_age` 年龄 · `gender_m` 男性指示 · `los_hours` 已住 ICU 时长\n"
-                "- `hospital_expire_flag` **可能泄漏标签**（与院内死亡强相关），B 训练时应评估剔除"
+                "- `anchor_age` / `gender_m` / `careunit_*`：入科可知（Wave1 无泄漏）\n"
+                "- 已剔除 `hospital_expire_flag`、总 `los_hours`（结局泄漏）\n"
+                "- 划分：train/val/test=0.7/0.1/0.2 · stay_id · seed=42（见 ROADMAP_EXEC）"
             )
             st.json(result.get("features", {}))
 

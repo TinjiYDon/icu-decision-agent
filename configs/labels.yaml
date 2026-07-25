@@ -11,6 +11,8 @@ split:
   val: 0.1
   test: 0.2
   by: stay_id
+  seed: 42
+  # Must keep three folds separate — do NOT merge val into test.
 
 recommend:
   observe: 0.2

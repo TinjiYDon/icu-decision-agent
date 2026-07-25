@@ -14,11 +14,17 @@ MIMIC stay → 特征/标签 → LightGBM 12h 死亡风险 → SHAP + 建议档�
 | B | 特征/标签/训练 | `domain/features/` `domain/models/` |
 | C | L4 + UI | `application/` `presentation/` `data_access/` |
 
+## 先读
+
+1. `docs/ROADMAP_EXEC.md`（Wave1/2）
+2. `docs/PARAM_STORY.md`
+3. `docs/STATUS.md`
+
 ## 命令
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m pytest tests/test_predict.py tests/test_smoke.py tests/test_mcp_predict.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_features_leak.py tests/test_predict.py tests/test_smoke.py tests/test_mcp_predict.py -q
 .\.venv\Scripts\python.exe -m application.train
 streamlit run presentation/streamlit_app.py
 # MCP（可选依赖）
@@ -29,8 +35,9 @@ streamlit run presentation/streamlit_app.py
 ## 关键契约
 
 - L4：`application.predict_patient.predict_patient(stay_id)` → `risk_score` / `recommend` / `top_factors`
+- 特征：`configs/features.yaml` · `domain.features.build.FEATURE_COLS`（无泄漏）
+- 划分：`domain.models.split` · 0.7/0.1/0.2 stay_id seed=42
 - MCP：`predict_risk(stay_id)` → 同上（`presentation/mcp_tools.py`）
-- 参数故事：`docs/PARAM_STORY.md`
 - Bugbot：`docs/BUGBOT.md`
 - **不做 PPO**；P3 是时序模型（GRU-D/TFT），见 `docs/INNOVATION_ROADMAP.md`
 

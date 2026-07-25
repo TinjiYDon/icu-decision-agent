@@ -1,6 +1,6 @@
 # 项目状态
 
-> 更新：2026-07-22
+> 更新：2026-07-25 · Wave1
 
 ## 数据检查点（已完成）
 
@@ -11,31 +11,28 @@
 | dump | ✓ 曾导出；本地若仅 schemas_only 见 `PARAM_STORY.md` |
 | 冒烟测试 | ✓ `run_data_pipeline.ps1` |
 
-## 模型阶段
+## 模型 / 特征
 
 | 项 | 状态 |
 |----|------|
-| mortality_12h + LightGBM | `application.train`（B · Issue #3） |
-| L4 `predict_patient` + `recommend` 档位 | ✅ C |
-| Streamlit 选 stay + SHAP + 建议 | ✅ C |
-| MCP Tool `predict_risk` | ✅ C 骨架（`presentation/mcp_server.py`） |
-| PPO / RL | ❌ 不做（方案 C） |
-| Bugbot | ✅ 已开（2026-07-22 · Dashboard Enable 三仓） |
+| 无泄漏 FEATURE_COLS | ✅ Wave1 |
+| 真三集 0.7/0.1/0.2 stay_id | ✅ Wave1 |
+| mortality_12h + LightGBM | ⏳ Wave2 · B 全量 train + AUC |
+| L4 `predict_patient` + recommend | ✅ C |
+| Streamlit + SHAP | ✅ C |
+| MCP `predict_risk` | ✅ C 骨架 |
+| PPO / RL | ❌ 不做 |
+| Bugbot | ✅ 已开 |
+| 路线图 | [`ROADMAP_EXEC.md`](ROADMAP_EXEC.md) |
 
 ## 成员 C 本阶段交付
 
-- `predict_patient` / SHAP 缓存 / recommend 档位
-- `docs/PARAM_STORY.md` 参数故事
-- Streamlit 风险建议展示
-- MCP `predict_risk` 工具骨架（`presentation/mcp_tools.py` + `mcp_server.py`）
+- Wave1：特征消毒 + split + PARAM_STORY / ROADMAP_EXEC
+- L4 / Streamlit / MCP 骨架
 
 ## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\python.exe -m pytest tests/test_predict.py tests/test_smoke.py tests/test_mcp_predict.py -q
-streamlit run presentation/streamlit_app.py
-# MCP（可选）
-.\.venv\Scripts\pip.exe install "mcp>=1.0"
-.\.venv\Scripts\python.exe -m presentation.mcp_server
+.\.venv\Scripts\python.exe -m pytest tests/test_features_leak.py tests/test_predict.py tests/test_mcp_predict.py -q
 ```

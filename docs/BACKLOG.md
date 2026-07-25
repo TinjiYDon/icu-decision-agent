@@ -12,12 +12,9 @@
 
 ## S1 · 训练闭环
 
-- [ ] **#S1-1** 成员 B：`application.train` 全量跑通，AUC/阳性率写入 STATUS  
-  - 验证：`python -m application.train`  
-  - 测试：新增 `tests/test_train.py`（smoke：能 fit、能 load）
-
-- [ ] **#S1-2** 成员 A：确认 `feat.sample_matrix` / `label.outcomes` 与 B 对齐  
-  - 验证：`pytest tests/test_etl.py -q`
+- [ ] **#S1-1** 成员 B：`application.train` 全量跑通，`auc_val`/`auc_test`/阳性率写入 STATUS（**Wave2**）
+- [ ] **#S1-2** 成员 A：feat/label + 非 schemas_only dump
+- [x] **#S1-3** 成员 C：去除泄漏特征 + 真三集划分（**Wave1** ✅ 2026-07-25）
 
 ---
 

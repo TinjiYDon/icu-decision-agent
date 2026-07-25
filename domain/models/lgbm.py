@@ -1,4 +1,4 @@
-"""LightGBM trainer for P0 tabular mortality model."""
+"""LightGBM trainer for P0 tabular mortality model (admission-time features)."""
 
 from __future__ import annotations
 
@@ -8,15 +8,15 @@ from pathlib import Path
 import lightgbm as lgb
 import pandas as pd
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
 from sqlalchemy import text
 
+from domain.features.build import FEATURE_COLS
+from domain.models.split import save_split_manifest, split_frame_by_stay
 from infra.config import load_yaml
 from infra.db import get_engine
 
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_DIR = ROOT / "artifacts" / "models"
-FEATURE_COLS = ["anchor_age", "gender_m", "los_hours", "hospital_expire_flag"]
 
 
 def _load_training_frame() -> pd.DataFrame:
@@ -44,14 +44,12 @@ def train_and_save() -> dict:
     if len(df) < 10:
         raise RuntimeError(f"too few samples for training: {len(df)}")
 
-    split_cfg = load_yaml("labels.yaml").get("split", {})
-    test_size = float(split_cfg.get("test", 0.2)) + float(split_cfg.get("val", 0.1))
+    train_df, val_df, test_df, manifest = split_frame_by_stay(df)
+    save_split_manifest(manifest)
 
-    X = df[FEATURE_COLS]
-    y = df["label"]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=42, stratify=y if y.nunique() > 1 else None
-    )
+    X_train, y_train = train_df[FEATURE_COLS], train_df["label"]
+    X_val, y_val = val_df[FEATURE_COLS], val_df["label"]
+    X_test, y_test = test_df[FEATURE_COLS], test_df["label"]
 
     pos = max(int(y_train.sum()), 1)
     neg = max(len(y_train) - pos, 1)
@@ -65,17 +63,33 @@ def train_and_save() -> dict:
         random_state=42,
         verbosity=-1,
     )
-    model.fit(X_train, y_train)
+    fit_kwargs: dict = {}
+    if len(val_df) > 0 and y_val.nunique() > 1:
+        fit_kwargs["eval_set"] = [(X_val, y_val)]
+        fit_kwargs["callbacks"] = [lgb.early_stopping(10, verbose=False)]
+    model.fit(X_train, y_train, **fit_kwargs)
 
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
     model.booster_.save_model(str(model_path))
 
-    metrics: dict = {"train_n": len(X_train), "test_n": len(X_test), "pos_rate": float(y.mean())}
-    if y_test.nunique() > 1:
-        proba = model.predict_proba(X_test)[:, 1]
-        metrics["auc"] = float(roc_auc_score(y_test, proba))
+    metrics: dict = {
+        "train_n": int(len(X_train)),
+        "val_n": int(len(X_val)),
+        "test_n": int(len(X_test)),
+        "pos_rate": float(df["label"].mean()),
+        "feature_cols": FEATURE_COLS,
+        "split": manifest["n_stays"],
+    }
+    if len(X_val) > 0 and y_val.nunique() > 1:
+        metrics["auc_val"] = float(roc_auc_score(y_val, model.predict_proba(X_val)[:, 1]))
     else:
+        metrics["auc_val"] = None
+    if len(X_test) > 0 and y_test.nunique() > 1:
+        metrics["auc_test"] = float(roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]))
+        metrics["auc"] = metrics["auc_test"]  # backward-compatible key
+    else:
+        metrics["auc_test"] = None
         metrics["auc"] = None
 
     engine = get_engine()
@@ -84,7 +98,7 @@ def train_and_save() -> dict:
             text(
                 """
                 INSERT INTO model.registry (name, version, path, metrics)
-                VALUES ('lgbm_mortality_12h', 'p0.1', :path, CAST(:metrics AS jsonb))
+                VALUES ('lgbm_mortality_12h', 'p0.2-noleak', :path, CAST(:metrics AS jsonb))
                 """
             ),
             {"path": str(model_path), "metrics": json.dumps(metrics)},
@@ -129,11 +143,7 @@ def _load_feature_row(stay_id: int) -> dict | None:
 
 
 def recommend_action(risk_score: float, score_kind: str = "probability") -> dict:
-    """Map score to clinical band using configs/labels.yaml recommend thresholds.
-
-    Bands (probability scale): observe <0.2, recheck <0.4, monitor <0.7, escalate >=0.7.
-    Raw (non-probability) scores return band=unknown so UI does not over-claim.
-    """
+    """Map score to clinical band using configs/labels.yaml recommend thresholds."""
     cfg = load_yaml("labels.yaml").get("recommend", {})
     observe = float(cfg.get("observe", 0.2))
     recheck = float(cfg.get("recheck", 0.4))
@@ -180,7 +190,6 @@ def predict_stay(stay_id: int) -> dict:
     booster, explainer = _get_model_bundle()
     row = [[feat[c] for c in FEATURE_COLS]]
     raw_score = float(booster.predict(row)[0])
-    # LGBM binary classifier: treat as probability when in [0,1], else raw logit label.
     risk_score = raw_score if 0.0 <= raw_score <= 1.0 else raw_score
     score_kind = "probability" if 0.0 <= raw_score <= 1.0 else "raw"
     shap_row = explainer.shap_values(row)
