@@ -27,5 +27,20 @@ Issue：S1-3 特征消毒；S1-1 重训 AUC（B）
 
 ## Wave2 等待清单（队友）
 
-- [ ] A：feat/label 与非 schemas_only dump（#4）
-- [ ] B：`application.train` 全量 + STATUS 填 `auc_val`/`auc_test`/`pos_rate`（#3）
+- [ ] A：feat/label 与非 schemas_only dump（#4）— **或 Owner 代备后发新 dump**
+- [ ] B：`application.train` 全量 + STATUS 填 `auc_val`/`auc_test`/`pos_rate`（#3）— 若 Owner 已训出 artifact，B 可只复核指标与文档
+
+## Owner 可代备（Wave2 数据底座 · 非 PPO）
+
+前置：Docker/本机 PG + Layer0 `mimic`（或 demo）已导入；`configs/database.yaml` 指向正确 DSN。
+
+```powershell
+$env:PYTHONPATH = (Get-Location)
+.\scripts\bootstrap_from_dump.ps1   # 或 restore 后跳过
+.\.venv\Scripts\python.exe -m application.run_etl_stage
+.\.venv\Scripts\python.exe -m application.train   # 内含 build_features + labels + lgbm
+.\scripts\export_layer1.ps1 -MimicSource mimic    # 导出含数据的 Layer1；勿只依赖误导性文件名
+```
+
+产物：`feat.sample_matrix` · `label.mortality_12h` · `artifacts/models/lgbm_*` · 新 `dumps/` + `DATA_VERSION_*.json`  
+**不做**：代 B 改 STATUS 叙事而不跑可复现命令；把总 LOS / expire 加回特征。
