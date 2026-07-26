@@ -7,7 +7,7 @@
 | Wave | 含义 | 状态 | 主责 |
 |------|------|------|------|
 | **1** | 去泄漏特征 + 真三集划分 | ✅ 代码已合 | C |
-| **2** | 全量 `train` + STATUS 写 auc_* | ⏳ 等 B/A + Layer1 | B |
+| **2** | 全量 `train` + STATUS 写 auc_* | ✅ Owner 代训已填 · B 可复核 | Owner→B |
 | **3** | （智学并行，见 zhixue ROADMAP） | — | — |
 
 | 划分 | 比例 | 规则 |
@@ -27,8 +27,9 @@ Issue：S1-3 特征消毒；S1-1 重训 AUC（B）
 
 ## Wave2 等待清单（队友）
 
-- [ ] A：feat/label 与非 schemas_only dump（#4）— **或 Owner 代备后发新 dump**
-- [ ] B：`application.train` 全量 + STATUS 填 `auc_val`/`auc_test`/`pos_rate`（#3）— 若 Owner 已训出 artifact，B 可只复核指标与文档
+- [x] Owner：feat/label + train artifact + `P0-full` dump（2026-07-26）
+- [ ] B：复核 `auc_val`/`auc_test`、实验笔记（#3）
+- [ ] A：确认可从新 dump restore（#4）
 
 ## Owner 可代备（Wave2 数据底座 · 非 PPO）
 
