@@ -19,7 +19,7 @@ MIMIC stay → 特征/标签 → LightGBM 12h 死亡风险 → SHAP + 建议档�
 1. `docs/ROADMAP_EXEC.md`（Wave1/2）
 2. `docs/PARAM_STORY.md`
 3. `docs/STATUS.md`
-4. `docs/TUNING_LOCAL.md`（Streamlit + MLflow）
+4. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md`
 
 ## 命令
 
