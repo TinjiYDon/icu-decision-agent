@@ -15,6 +15,9 @@ dumps/**/*
 artifacts/
 reports/
 reports/**/*
+mlruns/
+mlruns/**/*
+mlflow.db
 *.log
 *.pkl
 *.pt
