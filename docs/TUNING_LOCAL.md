@@ -6,14 +6,14 @@
 |------|------|
 | Streamlit | `streamlit run presentation/streamlit_app.py` |
 | MLflow | `python -m mlflow ui --backend-store-uri sqlite:///./mlflow.db` |
-| 训练 | `python -m application.train` |
+| full dump 训练 | `python -m application.train --from-existing` |
 | 进度 | `d:\project\_local-data\mimic\PROGRESS.md` |
 
 ```powershell
 cd d:\project\icu-decision-agent
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\pip.exe install mlflow streamlit
-.\.venv\Scripts\python.exe -m application.train
+.\.venv\Scripts\python.exe -m application.train --from-existing
 .\.venv\Scripts\python.exe -m mlflow ui --backend-store-uri sqlite:///./mlflow.db
 ```
 

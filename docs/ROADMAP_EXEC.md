@@ -28,7 +28,7 @@ Issue：S1-3 特征消毒；S1-1 重训 AUC（B）
 ## Wave2 等待清单（队友）
 
 - [x] Owner：feat/label + train artifact + `P0-full` dump（2026-07-26）
-- [ ] B：复核 `auc_val`/`auc_test`、实验笔记（#3）
+- [x] B：严格分层复核 + 完整不平衡指标 + 实验笔记（2026-07-31）
 - [ ] A：确认可从新 dump restore（#4）
 
 ## Owner 可代备（Wave2 数据底座 · 非 PPO）
