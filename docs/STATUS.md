@@ -1,56 +1,56 @@
 # 项目状态
 
-> 更新：2026-08-02 · **S1 早期预警**（`t=intime+1h`）· 多指标主叙事
+> 更新：2026-08-02 · **S2 多时刻流式样本** · 主指标 PR-AUC / Brier
 
 ## 定位
 
-ICU **实时早期恶化预警**（非入科瞬间分诊）。详见工作区 [`POSITIONING.md`](../../docs/POSITIONING.md) · [`S1_EARLY_WARNING.md`](S1_EARLY_WARNING.md)。
+ICU **实时早期恶化预警**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`。见 [`S1_EARLY_WARNING.md`](S1_EARLY_WARNING.md) · 工作区 `POSITIONING.md`。
 
-## 数据检查点
+## 对照简表
+
+| 模型 | 样本 | ROC test | **PR-AUC test** | Brier test |
+|------|------|----------|-----------------|------------|
+| Wave2 6-feat h=0 | 94k stays | 0.693 | **0.041** | 0.048 |
+| S1 单时刻 h=1 | 94k | 0.770 | **0.149** | 0.040 |
+| **S2 多时刻网格** | **472k**（94k×5） | **0.779** | **0.139** | **0.040** |
+
+## S2 主模型（2026-08-02）
+
+> `prediction_hours: [0,1,2,4,6]` · stay 级分层 split · `python -m application.train`
+
+| 指标 | val / test |
+|------|------------|
+| n_stays / rows | 94,458 / **472,290** |
+| **ROC-AUC（对照）** | 0.772 / **0.779** |
+| **PR-AUC（主）** | 0.163 / **0.139** |
+| **Brier（主）** | 0.040 / **0.040** |
+
+### test 按时刻切片（同一模型）
+
+| h | ROC | PR-AUC | P / R @工作点 |
+|---|-----|--------|----------------|
+| 0 | 0.694 | 0.066 | 23% / 7% |
+| 1 | 0.778 | 0.131 | 27% / 18% |
+| 2 | 0.802 | 0.155 | 28% / 23% |
+| 4 | 0.808 | 0.166 | 28% / 26% |
+| 6 | 0.809 | 0.164 | 27% / 25% |
+
+完整 `metrics_by_hour_test` 见 `artifacts/models/metrics_mortality_12h.json`。
+
+**结论**：S2 用多时刻训练后，整体 PR-AUC 与 S1 同量级；较晚时刻（h=4/6）切片 ROC/PR 更高，符合「观察越久信息越多」。禁止单报 ROC。
+
+## 数据
 
 | 项 | 状态 |
 |----|------|
-| Layer0 `mimic` @ :5432 | ✅ |
-| S1 feat/label `hour_index=1` | ✅ 94,458（本机重建） |
-| Wave2 dump（6-feat 对照） | ✅ `…20260726.dump` |
-| 标签 | ⚠️ 日期级 `dod` · [`LABEL_AUDIT.md`](LABEL_AUDIT.md) |
-
-## 对照：Wave2 弱基线（hour_index=0 · 6 特征）
-
-| 指标 | val / test |
-|------|------------|
-| ROC-AUC | 0.673 / 0.693 |
-| **PR-AUC** | **0.039 / 0.041** |
-| Brier | 0.048 / 0.048 |
-| 工作点 P/R（test） | 5.3% / 18.3% |
-
-## S1 主模型（hour_index=1 · Model-A 精简特征 · 2026-08-02）
-
-> `python -m application.train` · Layer0 rebuild · seed=42 stratified
-
-| 指标 | val / test |
-|------|------------|
-| n / 阳性 | 94,458 / **2,162**（~2.29%）；split 66,121 / 9,446 / 18,891 |
-| **ROC-AUC（对照）** | **0.769 / 0.770** |
-| **PR-AUC（主）** | **0.147 / 0.149** |
-| **Brier（主）** | **0.039 / 0.040** |
-| 工作点阈值（val max-F1） | 0.573 |
-| 工作点 P/R（test@阈值） | 30.6% / 18.2% |
-| 特征 | 19 列（含 `vasopressor_1h` 治疗暴露） |
-| artifact | `artifacts/models/lgbm_mortality_12h.txt`（不入 Git） |
-
-**结论：S1 相对 Wave2 基线，PR-AUC 约 3.6×，ROC 亦提升；仍非临床可单独部署，须多指标与阈值叙事。**
-
-## GitHub
-
-- S1 分支 → PR merge（本轮）
-- `liujiawei` 裸分支不合；已移植
-- Issue #3/#4 已关
+| Layer0 `:5432` | ✅ |
+| S2 feat/label | ✅ hour_index∈网格 |
+| 标签精度 | ⚠️ 日期级 dod |
 
 ## 验证
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m pytest tests/ -q
-.\.venv\Scripts\python.exe -m application.train   # 需 Layer0
+.\.venv\Scripts\python.exe -m application.train
 ```

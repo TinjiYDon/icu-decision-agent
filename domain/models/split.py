@@ -39,12 +39,25 @@ def split_frame_by_stay(
         raise ValueError(f"split ratios must sum to 1, got {total}")
     seed = int(cfg.get("seed", 42) if seed is None else seed)
 
-    label_counts = df.groupby(stay_col, dropna=False)[label_col].nunique(dropna=False)
-    conflicting = label_counts[label_counts > 1]
-    if not conflicting.empty:
-        raise ValueError(f"{len(conflicting)} stays have conflicting labels")
+    # S2 multi-hour: labels may differ by hour_index for the same stay.
+    # Split at stay level; stratify on max(label) so all hours of a stay stay together.
+    if "hour_index" in df.columns:
+        key_counts = df.groupby([stay_col, "hour_index"], dropna=False)[label_col].nunique(dropna=False)
+        conflicting = key_counts[key_counts > 1]
+        if not conflicting.empty:
+            raise ValueError(f"{len(conflicting)} stay/hour pairs have conflicting labels")
+        stays = (
+            df.groupby(stay_col, dropna=False)[label_col]
+            .max()
+            .reset_index()
+        )
+    else:
+        label_counts = df.groupby(stay_col, dropna=False)[label_col].nunique(dropna=False)
+        conflicting = label_counts[label_counts > 1]
+        if not conflicting.empty:
+            raise ValueError(f"{len(conflicting)} stays have conflicting labels")
+        stays = df[[stay_col, label_col]].drop_duplicates(stay_col).reset_index(drop=True)
 
-    stays = df[[stay_col, label_col]].drop_duplicates(stay_col).reset_index(drop=True)
     if stays[label_col].isna().any():
         raise ValueError("labels must not be null")
     unexpected_labels = set(stays[label_col].unique()).difference({0, 1})

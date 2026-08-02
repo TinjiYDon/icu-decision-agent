@@ -32,8 +32,20 @@ from infra.db import get_engine
 
 
 def prediction_hour_index() -> int:
-    """S1: hour_index=1 (intime+1h). S2: vary per sample row."""
+    """Default hour for single-row predict (S1 primary / S2 default)."""
     return int(load_yaml("features.yaml").get("hour_index", 1))
+
+
+def prediction_hours() -> list[int]:
+    """S2 grid of prediction offsets (hours after intime)."""
+    cfg = load_yaml("features.yaml")
+    hours = cfg.get("prediction_hours")
+    if hours is None:
+        return [int(cfg.get("prediction_offset_hours", cfg.get("hour_index", 1)))]
+    out = sorted({int(h) for h in hours})
+    if not out:
+        raise ValueError("prediction_hours must be non-empty")
+    return out
 
 # ── 基线 ──
 BASE_COLS = ["anchor_age", "gender_m", "careunit_micu", "careunit_sicu", "careunit_ccu", "careunit_other"]
@@ -261,61 +273,67 @@ def row_to_features(
 
 def build_features() -> dict:
     rows = fetch_cohort()
-    # S1 FEATURE_COLS 所需查询（跳过 admit/genetic/elix/sofa/abg 以控时；完整池仍可由 row_to_features 填 0）
+    hours = prediction_hours()
+    # Shared across hours (pre-ICU / admission)
     pre_icu = fetch_pre_icu_labs()
-    icu_labs = fetch_first_icu_labs()
-    vitals = fetch_first_icu_vitals()
+    los = fetch_pre_icu_los()
     admits: dict = {}
     genetics: dict = {}
-    los = fetch_pre_icu_los()
-    gcs = fetch_gcs_total()
-    vaso = fetch_vasopressor_1h()
     elix: dict = {}
     sofa: dict = {}
     abg: dict = {}
     gcs_sub: dict = {}
     vent: dict = {}
 
-    hour_index = prediction_hour_index()
     engine = get_engine()
+    n_inserted = 0
     with engine.begin() as conn:
         conn.execute(text("TRUNCATE feat.sample_matrix"))
-        for row in rows:
-            sid = row["stay_id"]
-            feat = row_to_features(
-                row,
-                pre_icu_labs=pre_icu.get(sid),
-                first_icu_labs=icu_labs.get(sid),
-                first_vitals=vitals.get(sid),
-                admit_info=admits.get(sid),
-                genetic_flags=genetics.get(sid),
-                pre_icu_los=los.get(sid),
-                gcs_total=gcs.get(sid),
-                vasopressor_1h=vaso.get(sid),
-                elixhauser=elix.get(sid),
-                sofa_components=sofa.get(sid),
-                abg=abg.get(sid),
-                gcs_subscores=gcs_sub.get(sid),
-                vent_flag=vent.get(sid),
-            )
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO feat.sample_matrix (stay_id, hour_index, feature_json)
-                    VALUES (:stay_id, :hour_index, CAST(:feature_json AS jsonb))
-                    """
-                ),
-                {
-                    "stay_id": sid,
-                    "hour_index": hour_index,
-                    "feature_json": json.dumps(
-                        {k: _json_safe(v) for k, v in feat.items()}, ensure_ascii=False
+        for h in hours:
+            icu_labs = fetch_first_icu_labs(window_hours=h)
+            vitals = fetch_first_icu_vitals(window_hours=h)
+            gcs = fetch_gcs_total(window_hours=h)
+            vaso = fetch_vasopressor_1h(window_hours=h)
+            for row in rows:
+                sid = row["stay_id"]
+                feat = row_to_features(
+                    row,
+                    pre_icu_labs=pre_icu.get(sid),
+                    first_icu_labs=icu_labs.get(sid),
+                    first_vitals=vitals.get(sid),
+                    admit_info=admits.get(sid),
+                    genetic_flags=genetics.get(sid),
+                    pre_icu_los=los.get(sid),
+                    gcs_total=gcs.get(sid),
+                    vasopressor_1h=vaso.get(sid),
+                    elixhauser=elix.get(sid),
+                    sofa_components=sofa.get(sid),
+                    abg=abg.get(sid),
+                    gcs_subscores=gcs_sub.get(sid),
+                    vent_flag=vent.get(sid),
+                )
+                feat["prediction_offset_hours"] = h
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO feat.sample_matrix (stay_id, hour_index, feature_json)
+                        VALUES (:stay_id, :hour_index, CAST(:feature_json AS jsonb))
+                        """
                     ),
-                },
-            )
+                    {
+                        "stay_id": sid,
+                        "hour_index": h,
+                        "feature_json": json.dumps(
+                            {k: _json_safe(v) for k, v in feat.items()}, ensure_ascii=False
+                        ),
+                    },
+                )
+                n_inserted += 1
     return {
-        "feat_rows": len(rows),
+        "feat_rows": n_inserted,
+        "n_stays": len(rows),
         "feature_cols": FEATURE_COLS,
-        "hour_index": hour_index,
+        "prediction_hours": hours,
+        "hour_index": prediction_hour_index(),
         "stored_feature_cols": WAVE_A_FULL_COLS,
     }

@@ -15,8 +15,8 @@
 | **P0** ✓ | Demo 跑通 | ETL + LightGBM + dump |
 | **P1** ✓ | 可解释 Demo | Streamlit + SHAP |
 | **P2** ✓ 骨架 | 标准接口 | MCP `predict_risk` |
-| **S1** | 实时早期预警切片 | `hour_index=1` + 扩展特征 + **多指标** |
-| **S2** | 多时刻流式样本 | 同一 `prediction_time` API，h 网格 |
+| **S1** ✓ | 实时早期预警切片 | `hour_index=1` + 扩展特征 + **多指标** |
+| **S2** ✓ | 多时刻流式样本 | `prediction_hours=[0,1,2,4,6]` · 472k 行 |
 | **P3** | 时序升级 | GRU-D / TFT（未做） |
 
 ## 评测（投刊/答辩）

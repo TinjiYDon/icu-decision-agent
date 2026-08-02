@@ -8,9 +8,9 @@ from pathlib import Path
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
-from domain.features.build import FEATURE_COLS, prediction_hour_index
+from domain.features.build import FEATURE_COLS, prediction_hour_index, prediction_hours
 from domain.models.evaluation import binary_metrics, select_threshold_by_f1
 from domain.models.split import save_split_manifest, split_frame_by_stay
 from infra.config import load_yaml
@@ -21,16 +21,18 @@ ARTIFACT_DIR = ROOT / "artifacts" / "models"
 
 
 def _load_training_frame() -> pd.DataFrame:
-    hour_index = prediction_hour_index()
+    hours = prediction_hours()
     engine = get_engine()
-    sql = """
-        SELECT f.stay_id, f.feature_json, l.label
+    sql = text(
+        """
+        SELECT f.stay_id, f.hour_index, f.feature_json, l.label
         FROM feat.sample_matrix f
         JOIN label.mortality_12h l ON f.stay_id = l.stay_id AND f.hour_index = l.hour_index
-        WHERE f.hour_index = :hour_index
-    """
+        WHERE f.hour_index IN :hours
+        """
+    ).bindparams(bindparam("hours", expanding=True))
     with engine.connect() as conn:
-        rows = conn.execute(text(sql), {"hour_index": hour_index}).mappings().all()
+        rows = conn.execute(sql, {"hours": list(hours)}).mappings().all()
     records = []
     for row in rows:
         feat = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
@@ -42,6 +44,7 @@ def _load_training_frame() -> pd.DataFrame:
             rec[c] = v
         rec["label"] = int(row["label"])
         rec["stay_id"] = row["stay_id"]
+        rec["hour_index"] = int(row["hour_index"])
         records.append(rec)
     return pd.DataFrame(records)
 
@@ -116,6 +119,20 @@ def train_and_save() -> dict:
     metrics["pr_auc_test"] = test_default["pr_auc"]
     metrics["brier_val"] = val_default["brier"]
     metrics["brier_test"] = test_default["brier"]
+    metrics["prediction_hours"] = prediction_hours()
+    metrics["n_stays"] = int(df["stay_id"].nunique())
+
+    # Per-hour test metrics (same model, sliced)
+    by_hour: dict = {}
+    test_with_h = test_df.copy()
+    test_with_h["prob"] = test_probability
+    for h, part in test_with_h.groupby("hour_index"):
+        if len(part) < 5 or part["label"].nunique() < 2:
+            continue
+        by_hour[str(int(h))] = binary_metrics(
+            part["label"], part["prob"].to_numpy(), threshold=operating_threshold
+        )
+    metrics["metrics_by_hour_test"] = by_hour
 
     metrics_path = ARTIFACT_DIR / "metrics_mortality_12h.json"
     metrics_path.write_text(
