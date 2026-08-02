@@ -23,5 +23,5 @@
 
 - [x] S1 特征/标签重建 + STATUS
 - [x] 对照 Wave2 写入 STATUS
-- [ ] S1 PR merge
+- [x] S1 [PR #7](https://github.com/TinjiYDon/icu-decision-agent/pull/7) merge
 - [ ] S2 h 网格（后续）
