@@ -22,15 +22,15 @@
 训练：python -m application.train
 验收：pytest tests/test_features_leak.py tests/test_predict.py tests/test_evaluation.py tests/test_train.py -q
 禁止：把结局列加回 FEATURE_COLS；用 test 调参；未审计合入 liujiawei
-Issue：#4 A restore；#3 可关（PR#6）；liujiawei 待审计
+Issue：#3/#4 已关；liujiawei 见 LIUJIAWEI_HOLD.md（L3 不合）
 ```
 
 ## Wave2 清单
 
 - [x] Owner：feat/label + artifact + P0-full dump
 - [x] B：分层复核 · PR #6 merged 2026-08-02
-- [ ] A：dump restore 验收（#4）
-- [ ] `liujiawei`：泄漏/时刻审计通过前 **禁止合 main**
+- [x] Owner：dump restore 签收（#4 · 94458 · AUC 0.673/0.693）
+- [ ] `liujiawei`：按 [`LIUJIAWEI_HOLD.md`](LIUJIAWEI_HOLD.md) 一次干净 PR 前 **禁止合 main**
 
 ## Owner 可代备（Wave2 数据底座 · 非 PPO）
 
