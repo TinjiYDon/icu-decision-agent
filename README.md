@@ -35,6 +35,8 @@ $env:PYTHONPATH = (Get-Location)
 
 口播步骤见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：项目总览 → 监测高低风险 → 验收校准/净受益。
 
+演示前请 restore S2 dump（见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)）。**勿**在 restore 后再跑会清空 `feat` 的 P0 ETL。监测台主信号为年龄+化验；chart 生命体征在 dump 中多为缺测。
+
 ## 架构
 
 ```

@@ -7,8 +7,9 @@
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
 | [STATUS.md](STATUS.md) | 当前进度 |
-| [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore** |
-| [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 |
+| [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore**（含特征口径） |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | **答辩演示口播** |
+| [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 / 常见问题 |
 | [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化建议 |
 | [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md) | 里程碑 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |

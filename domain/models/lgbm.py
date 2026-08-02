@@ -172,7 +172,54 @@ def _get_model_bundle() -> tuple[lgb.Booster, object]:
     return _model_bundle
 
 
+# Probe keys: S2 dump is lab-heavy; chart vitals are often null in export.
+_CLINICAL_PROBE = (
+    "anchor_age",
+    "lab_lactate",
+    "lab_creatinine",
+    "lab_hematocrit",
+    "lab_bun",
+    "lab_sodium",
+    "lab_ph",
+    "vital_heart_rate",
+)
+
+
+def _nonzero(raw: dict, key: str) -> bool:
+    if key not in raw or raw[key] is None:
+        return False
+    try:
+        return float(raw[key]) != 0.0
+    except (TypeError, ValueError):
+        return True
+
+
+def _feature_quality(raw: dict) -> dict:
+    """Assess completeness of stored feature_json (before model zero-fill)."""
+    present = sum(1 for k in _CLINICAL_PROBE if _nonzero(raw, k))
+    lab_present = sum(
+        1 for k in raw if k.startswith("lab_") and _nonzero(raw, k)
+    )
+    placeholder = set(raw.keys()) <= {"los_hours", "first_careunit"}
+    has_age = _nonzero(raw, "anchor_age")
+    usable = (not placeholder) and has_age and lab_present >= 2
+    return {
+        "clinical_present": present,
+        "clinical_total": len(_CLINICAL_PROBE),
+        "lab_present": lab_present,
+        "is_placeholder": placeholder,
+        "usable": usable,
+    }
+
+
 def _load_feature_row(stay_id: int, hour_index: int | None = None) -> dict | None:
+    """Load features for model + display.
+
+    Returns dict with:
+      - model_features: FEATURE_COLS filled with 0 for missing (inference)
+      - features_display: same keys, None when absent/null in JSON
+      - feature_quality: completeness flags
+    """
     h = prediction_hour_index() if hour_index is None else int(hour_index)
     engine = get_engine()
     with engine.connect() as conn:
@@ -187,8 +234,19 @@ def _load_feature_row(stay_id: int, hour_index: int | None = None) -> dict | Non
         ).mappings().first()
     if not row:
         return None
-    feat = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
-    return {c: (feat.get(c, 0) if feat.get(c) is not None else 0) for c in FEATURE_COLS}
+    raw = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
+    model_features = {
+        c: (raw.get(c, 0) if raw.get(c) is not None else 0) for c in FEATURE_COLS
+    }
+    features_display = {
+        c: (raw[c] if c in raw and raw[c] is not None else None) for c in FEATURE_COLS
+    }
+    return {
+        "model_features": model_features,
+        "features_display": features_display,
+        "feature_quality": _feature_quality(raw),
+        "raw_keys": sorted(raw.keys()),
+    }
 
 
 def recommend_action(risk_score: float, score_kind: str = "probability") -> dict:
@@ -230,8 +288,8 @@ def predict_stay(stay_id: int, hour_index: int | None = None) -> dict:
             "message": "Run `python -m application.train` first.",
         }
 
-    feat = _load_feature_row(stay_id, hour_index=h)
-    if feat is None:
+    loaded = _load_feature_row(stay_id, hour_index=h)
+    if loaded is None:
         return {
             "stay_id": stay_id,
             "hour_index": h,
@@ -239,6 +297,9 @@ def predict_stay(stay_id: int, hour_index: int | None = None) -> dict:
             "message": "Stay not found in feat.sample_matrix; run ETL + build_features.",
         }
 
+    feat = loaded["model_features"]
+    display = loaded["features_display"]
+    quality = loaded["feature_quality"]
     booster, explainer = _get_model_bundle()
     row = np.asarray([[feat[c] for c in FEATURE_COLS]], dtype=float)
     raw_score = float(booster.predict(row)[0])
@@ -251,9 +312,20 @@ def predict_stay(stay_id: int, hour_index: int | None = None) -> dict:
     else:
         values = shap_row[0]
     pairs = sorted(zip(FEATURE_COLS, values), key=lambda x: abs(float(x[1])), reverse=True)
+    # Prefer explaining features that were actually observed (not zero-filled missing).
+    observed = [
+        (name, contrib)
+        for name, contrib in pairs
+        if display.get(name) is not None
+    ]
+    ranked = observed if len(observed) >= 2 else pairs
     top_factors = [
-        {"feature": name, "value": feat[name], "shap": round(float(contrib), 4)}
-        for name, contrib in pairs[:4]
+        {
+            "feature": name,
+            "value": display.get(name),
+            "shap": round(float(contrib), 4),
+        }
+        for name, contrib in ranked[:4]
     ]
     return {
         "stay_id": stay_id,
@@ -263,7 +335,9 @@ def predict_stay(stay_id: int, hour_index: int | None = None) -> dict:
         "score_kind": score_kind,
         "recommend": recommend_action(risk_score, score_kind),
         "top_factors": top_factors,
-        "features": feat,
+        "features": display,
+        "features_model": feat,
+        "feature_quality": quality,
     }
 
 

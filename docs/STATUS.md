@@ -1,7 +1,7 @@
 # 项目状态
 
 > 更新：2026-08-02 · **S2 多时刻流式样本** · 主指标 PR-AUC / Brier  
-> **演示台 v4**：总览 + 监测专业层 + 验收决策净受益曲线 · 口播 [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
+> **演示台 v4.1**：总览 + 监测（缺测/切换修复）+ 验收净受益 · 口播 [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
 
 ## 定位
 
@@ -47,9 +47,16 @@ ICU **实时早期恶化预警**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`
 | Layer0 `:5432` | ✅ |
 | S2 feat/label | ✅ hour_index∈网格 · **472,290** |
 | **S2 dump** | ✅ `dumps/icu_decision_S2-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
-| 交互台 | ✅ **Plotly 监测台** Monitor/Tune/Accept · `python -m streamlit run presentation/streamlit_app.py` |
+| 交互台 | ✅ **Plotly 监测台 v4.1** 项目/监测/调参/验收 · `.\scripts\run_console.ps1` |
+| dump 特征口径 | ⚠️ **化验+年龄为主**；chart 生命体征在导出中多为 null（非 UI bug） |
 | 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
 | 标签精度 | ⚠️ 日期级 dod |
+
+### 监测台注意（v4.1）
+
+- **禁止** restore 后再跑会 `TRUNCATE feat.sample_matrix` 的 P0 ETL（会把特征冲成仅 `los_hours`/`first_careunit`，UI 全 0）。
+- 列表默认只展示「年龄 + ≥2 化验」可用 stay；缺测显示 `—`；SHAP 优先解释实际有值特征。
+- 启动务必清掉脏 `DATABASE_URL`：用 `.\scripts\run_console.ps1`。
 
 ## 验证
 

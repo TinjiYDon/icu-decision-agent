@@ -1,7 +1,7 @@
 # 答辩演示口播（3–5 分钟）
 
 > 启动：`.\scripts\run_console.ps1` → http://localhost:8501  
-> 前置：已 restore S2 dump，且存在 `artifacts/models/lgbm_mortality_12h.txt`
+> 前置：已 restore S2 dump（feat≈472k），且存在 `artifacts/models/lgbm_mortality_12h.txt`
 
 ## 流程
 
@@ -11,12 +11,14 @@
    - 一句免责：研究演示，非床旁器械。
 
 2. **监测**（约 2min）  
-   - 侧栏点「高风险样例」→ 风险徽章 + 建议动作档位 + 多时刻曲线。  
-   - 指 SHAP：为何此刻偏高。  
+   - 侧栏确认 `stay=` / `h=` 会随选择变化（ui v4.1）。  
+   - 点「高风险样例」→ 风险徽章 + 建议动作 + 多时刻曲线。  
+   - 面板以 **年龄/化验** 为主；心率等缺测显示 `—`（dump 口径，见 [`DUMP_READY.md`](DUMP_READY.md)）。  
+   - 指 SHAP：优先解释**实际有值**特征（勿用全零向量讲故事）。  
    - 再点「低风险样例」对比。
 
 3. **验收**（约 1min）  
-   - Layer1 行数门禁（约 472k）。  
+   - Layer1 行数门禁（约 472k，五时刻）。  
    - 校准曲线 + **决策净受益**曲线（测试集抽样 ≤5k）。  
    - 强调：稀有阳性优先 PR-AUC，勿单报 ROC。
 
@@ -29,3 +31,5 @@
 cd d:\project\icu-decision-agent
 .\scripts\run_console.ps1
 ```
+
+若监测全是 0 / 占位警示：重新 restore S2 dump，**不要**再跑会清空 feat 的 P0 ETL。
