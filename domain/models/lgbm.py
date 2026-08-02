@@ -7,10 +7,10 @@ from pathlib import Path
 
 import lightgbm as lgb
 import pandas as pd
-from sklearn.metrics import roc_auc_score
 from sqlalchemy import text
 
 from domain.features.build import FEATURE_COLS
+from domain.models.evaluation import binary_metrics, select_threshold_by_f1
 from domain.models.split import save_split_manifest, split_frame_by_stay
 from infra.config import load_yaml
 from infra.db import get_engine
@@ -73,24 +73,48 @@ def train_and_save() -> dict:
     model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
     model.booster_.save_model(str(model_path))
 
+    val_probability = model.predict_proba(X_val)[:, 1]
+    test_probability = model.predict_proba(X_test)[:, 1]
+    operating_threshold = (
+        select_threshold_by_f1(y_val, val_probability)
+        if len(X_val) > 0 and y_val.nunique() > 1
+        else 0.5
+    )
+    val_default = binary_metrics(y_val, val_probability, threshold=0.5)
+    test_default = binary_metrics(y_test, test_probability, threshold=0.5)
+    val_operating = binary_metrics(y_val, val_probability, threshold=operating_threshold)
+    test_operating = binary_metrics(y_test, test_probability, threshold=operating_threshold)
+
     metrics: dict = {
+        "total_n": int(len(df)),
+        "positive": int(df["label"].sum()),
         "train_n": int(len(X_train)),
         "val_n": int(len(X_val)),
         "test_n": int(len(X_test)),
         "pos_rate": float(df["label"].mean()),
         "feature_cols": FEATURE_COLS,
         "split": manifest["n_stays"],
+        "split_class_counts": manifest["class_counts"],
+        "split_positive_rate": manifest["positive_rate"],
+        "stratified": manifest["stratified"],
+        "operating_threshold": operating_threshold,
+        "threshold_selection": "maximum F1 on validation split",
+        "metrics_at_0_5": {"val": val_default, "test": test_default},
+        "metrics_at_val_threshold": {"val": val_operating, "test": test_operating},
     }
-    if len(X_val) > 0 and y_val.nunique() > 1:
-        metrics["auc_val"] = float(roc_auc_score(y_val, model.predict_proba(X_val)[:, 1]))
-    else:
-        metrics["auc_val"] = None
-    if len(X_test) > 0 and y_test.nunique() > 1:
-        metrics["auc_test"] = float(roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]))
-        metrics["auc"] = metrics["auc_test"]  # backward-compatible key
-    else:
-        metrics["auc_test"] = None
-        metrics["auc"] = None
+    metrics["auc_val"] = val_default["roc_auc"]
+    metrics["auc_test"] = test_default["roc_auc"]
+    metrics["auc"] = metrics["auc_test"]  # backward-compatible key
+    metrics["pr_auc_val"] = val_default["pr_auc"]
+    metrics["pr_auc_test"] = test_default["pr_auc"]
+    metrics["brier_val"] = val_default["brier"]
+    metrics["brier_test"] = test_default["brier"]
+
+    metrics_path = ARTIFACT_DIR / "metrics_mortality_12h.json"
+    metrics_path.write_text(
+        json.dumps(metrics, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     engine = get_engine()
     with engine.begin() as conn:
@@ -98,13 +122,13 @@ def train_and_save() -> dict:
             text(
                 """
                 INSERT INTO model.registry (name, version, path, metrics)
-                VALUES ('lgbm_mortality_12h', 'p0.2-noleak', :path, CAST(:metrics AS jsonb))
+                VALUES ('lgbm_mortality_12h', 'p0.3-stratified', :path, CAST(:metrics AS jsonb))
                 """
             ),
             {"path": str(model_path), "metrics": json.dumps(metrics)},
         )
 
-    return {"model_path": str(model_path), **metrics}
+    return {"model_path": str(model_path), "metrics_path": str(metrics_path), **metrics}
 
 
 _model_bundle: tuple[lgb.Booster, object] | None = None

@@ -15,9 +15,10 @@
 
 ```text
 decision restore: .\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_P0-full_mimic_94458stays_20260726.dump
-然后: PYTHONPATH=. python -m application.train   # 可重训；或直接用已有 artifact
+然后: PYTHONPATH=. python -m application.train --from-existing
 scheduling restore: 同上指向 20260727 dump
 禁止: 把 schemas_only / 20260708 旧 dump 当全量训练底座
+禁止: full dump 恢复后在无 Layer0 时运行默认 application.train（会重建 feat/label）
 禁止: 宣称 Layer1 dump 含 labevents 或 PPO 轨迹
 验收 DB: feat/label 或 sofa 行数 ≈ 94458
 ```
