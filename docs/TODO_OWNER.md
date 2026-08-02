@@ -24,6 +24,6 @@
 $env:PYTHONPATH = (Get-Location)
 python -m application.train          # 需 Layer1 数据
 python -m application.predict_patient
-streamlit run presentation/streamlit_app.py
+.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8501
 pytest tests/test_predict.py -q
 ```

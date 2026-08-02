@@ -21,8 +21,9 @@ $env:PYTHONPATH = (Get-Location)
 | 文档 | 说明 |
 |------|------|
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
-| [docs/DATA_LOCAL.md](docs/DATA_LOCAL.md) | MIMIC / dump 本地配置 |
-| [docs/TODO_OWNER.md](docs/TODO_OWNER.md) | 成员 C 集成待办 |
+| [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发** |
+| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly 监测台 |
+| [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
 | [docs/README.md](docs/README.md) | 文档索引 |
 
 ## 架构
@@ -40,7 +41,11 @@ docker compose up -d   # PostgreSQL 端口 5433
 ## 模型与演示
 
 ```powershell
-python -m application.train
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+# 有 S2 dump 时（推荐）:
+.\.venv\Scripts\python.exe -m application.train --from-existing
+.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8501
 ```
+
+线下 dump：见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)（**不入 Git**）。监测台页面：Monitor / Tune / Accept。
 

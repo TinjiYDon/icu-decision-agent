@@ -40,19 +40,19 @@ $env:PYTHONPATH = (Get-Location)
 ### 3. 模型与演示（成员 C 骨架 ✅）
 
 ```powershell
-python -m application.train
-python -m application.run_p0
-streamlit run presentation/streamlit_app.py
+$env:PYTHONPATH = (Get-Location)
+.\.venv\Scripts\python.exe -m application.train --from-existing
+.\.venv\Scripts\python.exe -m streamlit run presentation/streamlit_app.py --server.port 8501
 ```
 
-L4：`predict_patient(stay_id)` · `list_stays()` — 见 [`docs/TODO_OWNER.md`](TODO_OWNER.md)
+L4：`predict_patient(stay_id, hour_index=…)` · `list_stays()` · 监测台 Monitor/Tune/Accept  
+见 [`TUNING_LOCAL.md`](TUNING_LOCAL.md) · [`TODO_OWNER.md`](TODO_OWNER.md)
 
 ### 从已有 dump 恢复（跳过 ETL）
 
 ```powershell
-.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_P0-etl_mimic_94458stays_20260708.dump
-# 或自动选 dumps/ 下最新文件：
-.\scripts\bootstrap_from_dump.ps1 -SkipEtl
+.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_S2-full_mimic_94458stays_20260802.dump
+# 详见 DUMP_READY.md
 ```
 
 ## 检查点一览
@@ -61,16 +61,15 @@ L4：`predict_patient(stay_id)` · `list_stays()` — 见 [`docs/TODO_OWNER.md`]
 |------|------|------|
 | 连通性 | `scripts/check_env.py` | 含于 `run_data_pipeline` |
 | ETL | `application/run_etl_stage.py` | **数据阶段终点** |
-| 导出 | `scripts/export_layer1.ps1` | 输出到 `dumps/` |
-| 冒烟 | `pytest tests/test_{smoke,db,etl}.py` | 不含训练 |
-| 模型 | `application/train` | B 主责 |
-| 演示 | `streamlit run presentation/streamlit_app.py` | C ✅ |
+| 导出 | `scripts/export_layer1.ps1` | 输出到 `dumps/`（不入 Git） |
+| 冒烟 | `pytest tests/` | |
+| 模型 | `application.train --from-existing` | S2 dump 后推荐 |
+| 演示 | `python -m streamlit run presentation/streamlit_app.py` | Plotly 监测台 |
 
 ## dump 命名
 
-`{db}_P0-etl_{layer0}_{N}stays_{yyyymmdd}.dump`
-
-示例：`icu_decision_P0-etl_mimic_94458stays_20260708.dump`（放在 `dumps/`，不入 Git）
+当前交付：`icu_decision_S2-full_mimic_94458stays_20260802.dump`（`dumps/`，不入 Git）  
+见 [`DUMP_READY.md`](DUMP_READY.md)。
 
 可选镜像目录：`-DumpMirrorDir <path>` 或环境变量 `LOCAL_DATA_MIRROR`。
 
