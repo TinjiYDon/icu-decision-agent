@@ -8,12 +8,14 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
+from application.acceptance import load_metrics_artifact
 from application.predict_patient import (
     list_stays,
     predict_patient,
     predict_patient_trajectory,
 )
 from domain.features.build import prediction_hours
+from infra.config import load_yaml
 from infra.db import get_engine
 from presentation.ui.charts import fig_risk_trajectory, fig_shap_bars
 from presentation.ui.theme import disclaimer, risk_badge_html, status_message
@@ -97,10 +99,7 @@ def _pick_demo_stays(stays: list[dict[str, Any]], hour: int) -> tuple[int | None
 def render_monitor() -> None:
     st.title("ICU 早期恶化预警 · 监测台")
     st.caption("S2 多时刻 · LightGBM + SHAP · 选择住院记录后自动刷新")
-    # 可见版本条：用于确认浏览器连到的是最新代码（非旧进程）
-    st.info("界面版本 **2026-08-02-v3** · 若仍见英文标题，请关掉所有旧 Streamlit 后用 `scripts\\run_console.ps1` 启动")
 
-    # 清掉可能指向 zhixue 的环境变量（本进程内）
     import os
 
     for k in ("DATABASE_URL", "SQLALCHEMY_DATABASE_URI"):
@@ -108,6 +107,13 @@ def render_monitor() -> None:
     from infra.config import get_settings
 
     get_settings.cache_clear()
+
+    metrics = load_metrics_artifact() or {}
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    mc1.metric("训练样本", f"{metrics.get('total_n', '—'):,}" if metrics.get("total_n") else "—")
+    mc2.metric("PR-AUC（测试）", f"{float(metrics.get('pr_auc_test') or 0):.3f}" if metrics else "—")
+    mc3.metric("Brier（测试）", f"{float(metrics.get('brier_test') or 0):.3f}" if metrics else "—")
+    mc4.metric("工作点", f"{float(metrics.get('operating_threshold') or 0):.3f}" if metrics else "—")
 
     stays = list(list_stays(limit=800))
     feat_ids = set(_feat_stay_ids(3000))
@@ -133,7 +139,6 @@ def render_monitor() -> None:
         stay_id = options[choice]
         avail = list(_hours_for_stay(stay_id))
         hours = avail if avail else list(cfg_hours)
-        # 优先 h=1（S2 主叙事）；若库中只有 h=0 则自动回退
         prefer = 1 if 1 in hours else hours[0]
         hour = st.selectbox(
             "预测时刻（入科后小时）",
@@ -144,9 +149,10 @@ def render_monitor() -> None:
         if set(hours) != set(cfg_hours):
             st.caption(
                 f"提示：当前库仅有时刻 {hours}（配置为 {cfg_hours}）。"
-                "完整 S2 请 restore `icu_decision_S2-full_*20260802.dump`。"
+                "完整 S2 请 restore dump。"
             )
         st.caption(f"DB：{get_settings().database_url.split('@')[-1]}")
+        st.caption("ui v4 · `scripts\\run_console.ps1`")
         st.markdown("### 演示快捷")
         c1, c2 = st.columns(2)
         with c1:
@@ -181,6 +187,7 @@ def render_monitor() -> None:
     rec = result.get("recommend") or {}
     band = str(rec.get("band", "unknown"))
     band_label = str(rec.get("label", band))
+    thr = dict((load_yaml("labels.yaml").get("recommend") or {}))
 
     left, right = st.columns([1.1, 1.4], gap="large")
     with left:
@@ -188,8 +195,21 @@ def render_monitor() -> None:
             risk_badge_html(score, kind, band, band_label),
             unsafe_allow_html=True,
         )
-        st.markdown("")
+        st.markdown("#### 建议动作")
+        st.info(
+            f"**{band_label}**（band=`{band}`）\n\n"
+            f"阈值：观察 < {thr.get('observe', 0.2)} · "
+            f"复查 < {thr.get('recheck', 0.4)} · "
+            f"加强监护 < {thr.get('monitor', 0.7)} · 以上升级处置"
+        )
         feats = result.get("features") or {}
+        missing = sum(
+            1
+            for k in VITAL_LABELS
+            if feats.get(k) is None
+            or (isinstance(feats.get(k), (int, float)) and float(feats.get(k)) == 0)
+        )
+        st.caption(f"关键特征零值/缺失约 {missing}/{len(VITAL_LABELS)}（演示提示，非严格缺失审计）")
         cols = st.columns(4)
         for i, k in enumerate(list(VITAL_LABELS)[:8]):
             with cols[i % 4]:

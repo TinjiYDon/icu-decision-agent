@@ -1,4 +1,4 @@
-"""Acceptance / metrics secondary page."""
+"""验收门禁 + 校准 + 决策净受益。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from application.acceptance import load_metrics_artifact, layer1_counts
-from presentation.ui.charts import fig_calibration
+from application.demo_curves import compute_demo_net_benefit
+from presentation.ui.charts import fig_calibration, fig_net_benefit
 from presentation.ui.theme import disclaimer
 
 STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
@@ -16,7 +17,7 @@ STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
 
 def render_accept() -> None:
     st.title("验收门禁")
-    st.caption("Layer1 dump 行数 + 模型指标 artifact")
+    st.caption("Layer1 行数 · 主指标 · 校准 · 决策净受益（演示抽样）")
 
     try:
         counts = layer1_counts()
@@ -57,7 +58,19 @@ def render_accept() -> None:
                     }
                 )
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
         op = (metrics.get("metrics_at_val_threshold") or {}).get("test") or {}
+        st.subheader("工作点价值叙事")
+        if op:
+            cm = op.get("confusion_matrix") or {}
+            st.markdown(
+                f"- 工作点精确率 **{op.get('precision', 0):.1%}** · "
+                f"召回率 **{op.get('recall', 0):.1%}** · "
+                f"特异度 **{op.get('specificity', 0):.1%}**\n"
+                f"- 混淆：TP={cm.get('tp')} FP={cm.get('fp')} "
+                f"FN={cm.get('fn')} TN={cm.get('tn')}\n"
+                "- 解读：在稀有阳性结局下，优先看 **PR-AUC / 召回-精确权衡**，勿单报 ROC。"
+            )
         if op.get("calibration"):
             cal = op["calibration"]
             pred = list(cal.get("mean_predicted") or [])
@@ -68,9 +81,18 @@ def render_accept() -> None:
                     fig_calibration(pred[:n], actual[:n]),
                     use_container_width=True,
                 )
-        if op.get("confusion_matrix"):
-            st.subheader("混淆矩阵（工作点）")
-            st.json(op["confusion_matrix"])
+
+    st.subheader("决策曲线（净受益）")
+    with st.spinner("抽样测试集计算净受益（≤5k）…"):
+        curve = compute_demo_net_benefit()
+    if curve.get("status") == "ok":
+        st.caption(
+            f"抽样 n={curve.get('sampled_n')} · 阳性率={curve.get('prevalence', 0):.2%} · "
+            "曲线高于「全不干预」且尽量高于「全部干预」的区间，表示阈值有临床净受益。"
+        )
+        st.plotly_chart(fig_net_benefit(curve), use_container_width=True)
+    else:
+        st.info(f"净受益曲线暂不可用：{curve.get('message', curve.get('status'))}")
 
     with st.expander("项目状态 STATUS.md"):
         if STATUS.exists():

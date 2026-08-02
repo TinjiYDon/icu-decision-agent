@@ -104,3 +104,70 @@ def fig_calibration(mean_predicted: Sequence[float], fraction_positive: Sequence
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
     return fig
+
+
+def fig_hour_pr_auc(by_hour: dict[str, Any]) -> go.Figure:
+    hours = sorted(by_hour.keys(), key=lambda x: int(x))
+    pr = [float((by_hour[h] or {}).get("pr_auc") or 0) for h in hours]
+    fig = go.Figure(
+        go.Bar(
+            x=[f"h={h}" for h in hours],
+            y=pr,
+            marker_color=TEAL,
+            hovertemplate="%{x}<br>PR-AUC=%{y:.3f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="测试集 · 按预测时刻 PR-AUC",
+        yaxis_title="PR-AUC",
+        height=300,
+        margin=dict(l=40, r=20, t=48, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.9)",
+        font=dict(color=SLATE),
+    )
+    return fig
+
+
+def fig_net_benefit(curve: dict[str, Any]) -> go.Figure:
+    thr = curve.get("thresholds") or []
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=thr,
+            y=curve.get("net_benefit_model") or [],
+            mode="lines+markers",
+            name="模型",
+            line=dict(color=TEAL, width=3),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=thr,
+            y=curve.get("net_benefit_treat_all") or [],
+            mode="lines",
+            name="全部干预",
+            line=dict(color=AMBER, dash="dash"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=thr,
+            y=curve.get("net_benefit_treat_none") or [],
+            mode="lines",
+            name="全不干预",
+            line=dict(color="#94a3b8", dash="dot"),
+        )
+    )
+    fig.update_layout(
+        title="决策曲线（净受益 Net Benefit）",
+        xaxis_title="阈值概率",
+        yaxis_title="净受益",
+        height=360,
+        margin=dict(l=40, r=20, t=48, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.9)",
+        font=dict(color=SLATE),
+        legend=dict(orientation="h", y=1.12),
+    )
+    return fig

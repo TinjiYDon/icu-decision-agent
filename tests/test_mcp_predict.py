@@ -5,22 +5,36 @@ from presentation.mcp_tools import PREDICT_RISK_SCHEMA, predict_risk
 
 def test_predict_risk_schema():
     assert PREDICT_RISK_SCHEMA["name"] == "predict_risk"
-    assert "stay_id" in PREDICT_RISK_SCHEMA["inputSchema"]["properties"]
+    props = PREDICT_RISK_SCHEMA["inputSchema"]["properties"]
+    assert "stay_id" in props
+    assert "hour_index" in props
     assert PREDICT_RISK_SCHEMA["inputSchema"]["required"] == ["stay_id"]
 
 
 def test_predict_risk_forwards_l4():
     fake = {
         "stay_id": 42,
+        "hour_index": 1,
         "status": "ok",
         "risk_score": 0.31,
         "score_kind": "probability",
         "recommend": {"band": "recheck", "label": "复查（中低风险）"},
         "top_factors": [{"feature": "los_hours", "shap": 0.1}],
     }
-    with patch("presentation.mcp_tools.predict_patient", return_value=fake) as mocked:
+    with (
+        patch("presentation.mcp_tools.prediction_hour_index", return_value=1),
+        patch("presentation.mcp_tools.predict_patient", return_value=fake) as mocked,
+    ):
         out = predict_risk(42)
-    mocked.assert_called_once_with(42)
+    mocked.assert_called_once_with(42, hour_index=1)
     assert out["status"] == "ok"
     assert out["recommend"]["band"] == "recheck"
     assert out["risk_score"] == 0.31
+
+
+def test_predict_risk_forwards_hour_index():
+    fake = {"stay_id": 7, "hour_index": 4, "status": "ok", "risk_score": 0.2}
+    with patch("presentation.mcp_tools.predict_patient", return_value=fake) as mocked:
+        out = predict_risk(7, hour_index=4)
+    mocked.assert_called_once_with(7, hour_index=4)
+    assert out["hour_index"] == 4

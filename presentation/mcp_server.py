@@ -4,8 +4,8 @@ Install optional extra then run:
 
 ```powershell
 $env:PYTHONPATH = (Get-Location)
-.\.venv\Scripts\pip.exe install "mcp>=1.0"
-.\.venv\Scripts\python.exe -m presentation.mcp_server
+.\\ .venv\\Scripts\\pip.exe install "mcp>=1.0"
+.\\ .venv\\Scripts\\python.exe -m presentation.mcp_server
 ```
 """
 
@@ -28,8 +28,8 @@ def main() -> None:
         name=PREDICT_RISK_SCHEMA["name"],
         description=PREDICT_RISK_SCHEMA["description"],
     )
-    def predict_risk_tool(stay_id: int) -> dict:
-        return predict_risk(stay_id)
+    def predict_risk_tool(stay_id: int, hour_index: int | None = None) -> dict:
+        return predict_risk(stay_id, hour_index=hour_index)
 
     server.run(transport="stdio")
 
