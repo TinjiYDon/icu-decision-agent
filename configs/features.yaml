@@ -1,13 +1,11 @@
-# S1 early-warning contract: prediction at intime + prediction_offset_hours
-# S2-ready: same allowed columns; vary hour_index / offset per sample later.
-
+# S2 streaming early-warning: samples at multiple prediction times t=intime+h
 task: mortality_12h
-hour_index: 1
-prediction_offset_hours: 1
+hour_index: 1                    # default for single-stay predict API
+prediction_offset_hours: 1       # legacy alias / default if grid absent
+prediction_hours: [0, 1, 2, 4, 6]  # S2 grid (hours after intime)
 anchor: icu_intime
 
 allowed:
-  # Model-A refined set (training FEATURE_COLS)
   - anchor_age
   - careunit_other
   - vital_temp
@@ -24,7 +22,7 @@ allowed:
   - lab_albumin
   - pre_icu_los_hours
   - gcs_total
-  - vasopressor_1h          # treatment exposure within window; document in STATUS
+  - vasopressor_1h
   - shock_index
   - spo2_fio2_ratio
 
@@ -35,7 +33,8 @@ denied:
   - outtime
 
 notes: |
-  S1: t = intime + 1h; features with charttime <= t (pre-ICU labs preferred).
-  Label: death in [t, t+12h]. Not admission-instant triage.
-  Baseline contrast: Wave2 6-feat hour_index=0 remains historical (STATUS).
-  S2: parameterize offset and emit multiple hour_index rows per stay.
+  S2: one row per (stay_id, hour_index) for each h in prediction_hours.
+  Features: charttime < intime+h (pre-ICU labs preferred).
+  Label: death in [intime+h, intime+h+12h].
+  Split: by stay_id (all hours of a stay in the same fold).
+  h=0 ≈ admission/pre-ICU only (post-intime window empty).

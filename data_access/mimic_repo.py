@@ -12,7 +12,12 @@ from infra.config import get_data_source, get_layer0_dsn, get_settings
 
 def _window_hours() -> int:
     from infra.config import load_yaml
-    return max(int(load_yaml("features.yaml").get("prediction_offset_hours", 1)), 1)
+    return max(int(load_yaml("features.yaml").get("prediction_offset_hours", 1)), 0)
+
+
+def _wh(window_hours: int | None) -> int:
+    h = _window_hours() if window_hours is None else int(window_hours)
+    return max(h, 0)
 
 
 
@@ -186,7 +191,7 @@ def fetch_pre_icu_labs() -> dict[int, dict[str, float]]:
     return result
 
 
-def fetch_first_icu_vitals() -> dict[int, dict[str, float]]:
+def fetch_first_icu_vitals(window_hours: int | None = None) -> dict[int, dict[str, float]]:
     """First vital sign value AFTER intime for each stay → {stay_id: {vital_name: value}}."""
     source = get_data_source()
     if source == "mock":
@@ -200,7 +205,7 @@ def fetch_first_icu_vitals() -> dict[int, dict[str, float]]:
                 ROW_NUMBER() OVER (PARTITION BY c.stay_id, c.itemid ORDER BY c.charttime) AS rn
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
-            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND c.valuenum IS NOT NULL
               AND c.itemid IN ({_vital_itemid_list()})
         )
@@ -223,7 +228,7 @@ def fetch_first_icu_vitals() -> dict[int, dict[str, float]]:
     return result
 
 
-def fetch_first_icu_labs() -> dict[int, dict[str, float]]:
+def fetch_first_icu_labs(window_hours: int | None = None) -> dict[int, dict[str, float]]:
     """First lab value AFTER intime (within 1h) per stay → {stay_id: {lab_name: value}}.
     Used as fallback when pre-ICU labs are not available.
     """
@@ -239,7 +244,7 @@ def fetch_first_icu_labs() -> dict[int, dict[str, float]]:
                 ROW_NUMBER() OVER (PARTITION BY i.stay_id, l.itemid ORDER BY l.charttime) AS rn
             FROM mimiciv_icu.icustays i
             JOIN mimiciv_hosp.labevents l ON i.hadm_id = l.hadm_id
-            WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '1 hour'
+            WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND l.valuenum IS NOT NULL
               AND l.itemid IN ({_itemid_list()})
         )
@@ -318,7 +323,7 @@ def fetch_pre_icu_los() -> dict[int, float]:
     return {r["stay_id"]: float(r["pre_icu_los"]) for r in rows}
 
 
-def fetch_gcs_total() -> dict[int, int]:
+def fetch_gcs_total(window_hours: int | None = None) -> dict[int, int]:
     """GCS total score (E+V+M) — first recorded values within 1h of intime."""
     source = get_data_source()
     if source == "mock":
@@ -329,7 +334,7 @@ def fetch_gcs_total() -> dict[int, int]:
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
             WHERE c.itemid = 220739 AND c.valuenum IS NOT NULL
-              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
             ORDER BY c.stay_id, c.charttime
         ),
         verbal AS (
@@ -337,7 +342,7 @@ def fetch_gcs_total() -> dict[int, int]:
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
             WHERE c.itemid = 223900 AND c.valuenum IS NOT NULL
-              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
             ORDER BY c.stay_id, c.charttime
         ),
         motor AS (
@@ -345,7 +350,7 @@ def fetch_gcs_total() -> dict[int, int]:
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
             WHERE c.itemid = 223901 AND c.valuenum IS NOT NULL
-              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+              AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
             ORDER BY c.stay_id, c.charttime
         )
         SELECT
@@ -361,7 +366,7 @@ def fetch_gcs_total() -> dict[int, int]:
     return {r["stay_id"]: int(r["gcs_total"]) for r in rows}
 
 
-def fetch_vasopressor_1h() -> dict[int, int]:
+def fetch_vasopressor_1h(window_hours: int | None = None) -> dict[int, int]:
     """Whether any vasopressor was administered within 1h of ICU admission."""
     source = get_data_source()
     if source == "mock":
@@ -374,7 +379,7 @@ def fetch_vasopressor_1h() -> dict[int, int]:
         LEFT JOIN mimiciv_icu.inputevents ie
             ON i.stay_id = ie.stay_id
             AND ie.itemid IN (221906, 221289, 229617, 221662, 221653, 222315, 221749)
-            AND ie.starttime >= i.intime AND ie.starttime < i.intime + INTERVAL '1 hour'
+            AND ie.starttime >= i.intime AND ie.starttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
             AND ie.amount > 0
         ORDER BY i.stay_id, ie.starttime
     """
@@ -550,7 +555,7 @@ def fetch_elixhauser() -> dict[int, dict[str, int]]:
     return result
 
 
-def fetch_sofa_components() -> dict[int, dict[str, int]]:
+def fetch_sofa_components(window_hours: int | None = None) -> dict[int, dict[str, int]]:
     """SOFA component scores (0-4 each) + total, calculated in Python from raw values.
 
     Instead of a monster 8-CTE SQL, we fetch raw component values via
@@ -588,11 +593,11 @@ def fetch_sofa_components() -> dict[int, dict[str, int]]:
 
     with _read_engine().connect() as conn:
         # Chartevents: PaO2, FiO2, MAP, GCS
-        sql_vitals = """
+        sql_vitals = f"""
             SELECT c.stay_id, c.itemid, c.valuenum
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
-            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND c.valuenum IS NOT NULL
               AND c.itemid IN (50821, 223835, 220181, 220739, 223900, 223901)
         """
@@ -615,11 +620,11 @@ def fetch_sofa_components() -> dict[int, dict[str, int]]:
                 gcs_motor_map.setdefault(sid, val)
 
         # Ventilation flag (any vent settings within 1h)
-        sql_vent = """
+        sql_vent = f"""
             SELECT DISTINCT c.stay_id
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
-            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND c.itemid IN (223848, 223849, 224684, 224685, 224686, 224687)
         """
         rows = conn.execute(text(sql_vent)).mappings().all()
@@ -627,11 +632,11 @@ def fetch_sofa_components() -> dict[int, dict[str, int]]:
             vent_map[r["stay_id"]] = 1
 
         # Labevents: Platelets, Bilirubin, Creatinine
-        sql_labs = """
+        sql_labs = f"""
             SELECT i.stay_id, l.itemid, l.valuenum
             FROM mimiciv_icu.icustays i
             JOIN mimiciv_hosp.labevents l ON i.hadm_id = l.hadm_id
-            WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '1 hour'
+            WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND l.valuenum IS NOT NULL
               AND l.itemid IN (51265, 50885, 50912)
         """
@@ -646,11 +651,11 @@ def fetch_sofa_components() -> dict[int, dict[str, int]]:
                 cr_map.setdefault(sid, val)
 
         # Vasopressor rates within 1h
-        sql_vaso = """
+        sql_vaso = f"""
             SELECT ie.stay_id, ie.itemid, COALESCE(ie.rate, 0) AS rate
             FROM mimiciv_icu.inputevents ie
             JOIN mimiciv_icu.icustays i ON ie.stay_id = i.stay_id
-            WHERE ie.starttime >= i.intime AND ie.starttime < i.intime + INTERVAL '1 hour'
+            WHERE ie.starttime >= i.intime AND ie.starttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
               AND ie.amount > 0
               AND ie.itemid IN (221906, 221289, 221662, 221653)
         """
@@ -787,7 +792,7 @@ def fetch_sofa_components() -> dict[int, dict[str, int]]:
     return result
 
 
-def fetch_abg_first() -> dict[int, dict[str, float]]:
+def fetch_abg_first(window_hours: int | None = None) -> dict[int, dict[str, float]]:
     """Arterial blood gas: PaO2, PaCO2, FiO2, PaO2/FiO2 ratio, intubation flag.
     Only arterial specimens, first value within 1h of intime.
     """
@@ -801,7 +806,7 @@ def fetch_abg_first() -> dict[int, dict[str, float]]:
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 52033
           AND c.value = 'ART.'
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     ),
     pao2_first AS (
@@ -809,7 +814,7 @@ def fetch_abg_first() -> dict[int, dict[str, float]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 50821 AND c.valuenum IS NOT NULL
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     ),
     paco2_first AS (
@@ -817,7 +822,7 @@ def fetch_abg_first() -> dict[int, dict[str, float]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 50818 AND c.valuenum IS NOT NULL
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     ),
     fio2_lab AS (
@@ -832,7 +837,7 @@ def fetch_abg_first() -> dict[int, dict[str, float]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 50812
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     )
     SELECT
@@ -862,7 +867,7 @@ def fetch_abg_first() -> dict[int, dict[str, float]]:
     return result
 
 
-def fetch_gcs_subscores() -> dict[int, dict[str, int]]:
+def fetch_gcs_subscores(window_hours: int | None = None) -> dict[int, dict[str, int]]:
     """GCS sub-scores (Eye/Verbal/Motor) separately, first value within 1h of intime."""
     source = get_data_source()
     if source == "mock":
@@ -873,7 +878,7 @@ def fetch_gcs_subscores() -> dict[int, dict[str, int]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 220739 AND c.valuenum IS NOT NULL
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     ),
     verbal AS (
@@ -881,7 +886,7 @@ def fetch_gcs_subscores() -> dict[int, dict[str, int]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 223900 AND c.valuenum IS NOT NULL
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     ),
     motor AS (
@@ -889,7 +894,7 @@ def fetch_gcs_subscores() -> dict[int, dict[str, int]]:
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
         WHERE c.itemid = 223901 AND c.valuenum IS NOT NULL
-          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '1 hour'
+          AND c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
         ORDER BY c.stay_id, c.charttime
     )
     SELECT
@@ -911,7 +916,7 @@ def fetch_gcs_subscores() -> dict[int, dict[str, int]]:
     } for r in rows}
 
 
-def fetch_vent_flag() -> dict[int, int]:
+def fetch_vent_flag(window_hours: int | None = None) -> dict[int, int]:
     """Mechanical ventilation flag within 1h of intime."""
     source = get_data_source()
     if source == "mock":
@@ -924,7 +929,7 @@ def fetch_vent_flag() -> dict[int, int]:
     LEFT JOIN mimiciv_icu.chartevents v
         ON i.stay_id = v.stay_id
         AND v.itemid IN (223848, 223849, 224684, 224685, 224686, 224687, 224688, 224689, 224690, 224691)
-        AND v.charttime >= i.intime AND v.charttime < i.intime + INTERVAL '1 hour'
+        AND v.charttime >= i.intime AND v.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
     ORDER BY i.stay_id
     """
     with _read_engine().connect() as conn:

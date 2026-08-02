@@ -66,3 +66,20 @@ def test_split_rejects_conflicting_labels_for_same_stay():
     df = pd.DataFrame({"stay_id": [1, 1, 2, 3], "label": [0, 1, 0, 1]})
     with pytest.raises(ValueError, match="conflicting labels"):
         split_frame_by_stay(df, seed=42)
+
+
+def test_s2_split_keeps_multi_hour_stay_together():
+    """Same stay at different hours may have different labels; fold by stay_id."""
+    rows = []
+    for sid in range(100):
+        for h in (0, 1, 2):
+            # max(label) per stay = 1 for sid<20 → enough for stratified split
+            rows.append({"stay_id": sid, "hour_index": h, "label": 1 if sid < 20 and h >= 1 else 0})
+    df = pd.DataFrame(rows)
+    train, val, test, meta = split_frame_by_stay(df, seed=42)
+    assert set(train["stay_id"]).isdisjoint(set(val["stay_id"]))
+    assert set(train["stay_id"]).isdisjoint(set(test["stay_id"]))
+    for fold in (train, val, test):
+        counts = fold.groupby("stay_id")["hour_index"].nunique()
+        assert (counts == 3).all()
+    assert meta["n_stays"]["train"] + meta["n_stays"]["val"] + meta["n_stays"]["test"] == 100
