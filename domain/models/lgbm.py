@@ -172,7 +172,8 @@ def _get_model_bundle() -> tuple[lgb.Booster, object]:
     return _model_bundle
 
 
-def _load_feature_row(stay_id: int) -> dict | None:
+def _load_feature_row(stay_id: int, hour_index: int | None = None) -> dict | None:
+    h = prediction_hour_index() if hour_index is None else int(hour_index)
     engine = get_engine()
     with engine.connect() as conn:
         row = conn.execute(
@@ -182,7 +183,7 @@ def _load_feature_row(stay_id: int) -> dict | None:
                 WHERE stay_id = :stay_id AND hour_index = :hour_index
                 """
             ),
-            {"stay_id": stay_id, "hour_index": prediction_hour_index()},
+            {"stay_id": stay_id, "hour_index": h},
         ).mappings().first()
     if not row:
         return None
@@ -217,42 +218,73 @@ def recommend_action(risk_score: float, score_kind: str = "probability") -> dict
     }
 
 
-def predict_stay(stay_id: int) -> dict:
+def predict_stay(stay_id: int, hour_index: int | None = None) -> dict:
     """L3: single-stay mortality risk score + SHAP top factors."""
+    h = prediction_hour_index() if hour_index is None else int(hour_index)
     model_path = ARTIFACT_DIR / "lgbm_mortality_12h.txt"
     if not model_path.exists():
         return {
             "stay_id": stay_id,
+            "hour_index": h,
             "status": "no_model",
             "message": "Run `python -m application.train` first.",
         }
 
-    feat = _load_feature_row(stay_id)
+    feat = _load_feature_row(stay_id, hour_index=h)
     if feat is None:
         return {
             "stay_id": stay_id,
+            "hour_index": h,
             "status": "no_features",
             "message": "Stay not found in feat.sample_matrix; run ETL + build_features.",
         }
 
     booster, explainer = _get_model_bundle()
-    row = [[feat[c] for c in FEATURE_COLS]]
+    row = np.asarray([[feat[c] for c in FEATURE_COLS]], dtype=float)
     raw_score = float(booster.predict(row)[0])
     risk_score = raw_score if 0.0 <= raw_score <= 1.0 else raw_score
     score_kind = "probability" if 0.0 <= raw_score <= 1.0 else "raw"
     shap_row = explainer.shap_values(row)
-    values = shap_row[0] if isinstance(shap_row, list) else shap_row[0]
-    pairs = sorted(zip(FEATURE_COLS, values), key=lambda x: abs(x[1]), reverse=True)
+    if isinstance(shap_row, list):
+        # binary: prefer positive-class attributions when present
+        values = shap_row[1] if len(shap_row) > 1 else shap_row[0]
+    else:
+        values = shap_row[0]
+    pairs = sorted(zip(FEATURE_COLS, values), key=lambda x: abs(float(x[1])), reverse=True)
     top_factors = [
         {"feature": name, "value": feat[name], "shap": round(float(contrib), 4)}
         for name, contrib in pairs[:4]
     ]
     return {
         "stay_id": stay_id,
+        "hour_index": h,
         "status": "ok",
         "risk_score": round(risk_score, 4),
         "score_kind": score_kind,
         "recommend": recommend_action(risk_score, score_kind),
         "top_factors": top_factors,
         "features": feat,
+    }
+
+
+def predict_stay_trajectory(stay_id: int, hours: list[int] | None = None) -> dict:
+    """Predict risk at each hour in the S2 grid (or provided list)."""
+    grid = list(hours) if hours is not None else prediction_hours()
+    points = []
+    for h in grid:
+        out = predict_stay(int(stay_id), hour_index=int(h))
+        points.append(
+            {
+                "hour_index": int(h),
+                "status": out.get("status"),
+                "risk_score": out.get("risk_score"),
+                "score_kind": out.get("score_kind"),
+                "recommend": out.get("recommend"),
+            }
+        )
+    ok = [p for p in points if p["status"] == "ok"]
+    return {
+        "stay_id": int(stay_id),
+        "status": "ok" if ok else (points[0]["status"] if points else "empty"),
+        "points": points,
     }

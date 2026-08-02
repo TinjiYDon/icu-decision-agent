@@ -25,6 +25,6 @@
 
 ## 当前重点
 
-1. S1 契约与 Layer0 重建训练（本机 5432 `mimic`）
-2. 对照 Wave2 6-feat 基线写入 STATUS
-3. S2：参数化 offset 已预留（`prediction_offset_hours`）
+1. **S2 dump 线下分发** + Streamlit 验收/细调台（已落地）
+2. 标签 `deathtime` 精度 → 重 dump（见工作区 `docs/TOP_TIER_NEXT.md`）
+3. P3 时序（GRU-D/TFT）仅在标签版本稳定后启动

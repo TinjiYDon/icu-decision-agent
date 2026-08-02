@@ -44,7 +44,10 @@ ICU **实时早期恶化预警**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`
 | 项 | 状态 |
 |----|------|
 | Layer0 `:5432` | ✅ |
-| S2 feat/label | ✅ hour_index∈网格 |
+| S2 feat/label | ✅ hour_index∈网格 · **472,290** |
+| **S2 dump** | ✅ `dumps/icu_decision_S2-full_mimic_94458stays_20260802.dump` · 见 [`DUMP_READY.md`](DUMP_READY.md) |
+| 交互台 | ✅ `streamlit run presentation/streamlit_app.py`（多时刻 / 细调 / 验收） |
+| 下一步 | [`TOP_TIER_NEXT.md`](TOP_TIER_NEXT.md) |
 | 标签精度 | ⚠️ 日期级 dod |
 
 ## 验证

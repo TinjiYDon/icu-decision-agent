@@ -23,4 +23,4 @@
 
 - [x] S1
 - [x] S2 网格训练 + STATUS
-- [ ] S2 PR merge
+- [x] S2 [PR #8](https://github.com/TinjiYDon/icu-decision-agent/pull/8) merge

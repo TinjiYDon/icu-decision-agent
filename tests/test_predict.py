@@ -21,3 +21,14 @@ def test_recommend_action_bands():
     assert recommend_action(0.5)["band"] == "monitor"
     assert recommend_action(0.8)["band"] == "escalate"
     assert recommend_action(0.5, score_kind="raw")["band"] == "unknown"
+
+
+def test_predict_patient_hour_index_kwarg():
+    from application.predict_patient import predict_patient, predict_patient_trajectory
+
+    out = predict_patient(999999999, hour_index=2)
+    assert out.get("hour_index") == 2
+    assert out["status"] in ("ok", "no_model", "no_features")
+    traj = predict_patient_trajectory(999999999)
+    assert "points" in traj
+    assert isinstance(traj["points"], list)
