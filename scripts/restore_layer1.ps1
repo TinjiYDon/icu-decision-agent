@@ -30,9 +30,9 @@ if (Test-Path "C:\Program Files\PostgreSQL\16\bin\psql.exe") {
 }
 # App connects as icu_dev; full dump restore often drops grants
 & $psql -h $PgHost -p $PgPort -U $PgUser -d $db -v ON_ERROR_STOP=1 -c @"
-GRANT USAGE ON SCHEMA staging, feat, label, model, app TO icu_dev;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA staging, feat, label, model, app TO icu_dev;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA staging, feat, label, model, app TO icu_dev;
+GRANT USAGE ON SCHEMA staging, feat, label, model, app, mock TO icu_dev;
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA staging, feat, label, model, app, mock TO icu_dev;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA staging, feat, label, model, app, mock TO icu_dev;
 "@
 if ($LASTEXITCODE -ne 0) { throw "GRANT to icu_dev failed (exit $LASTEXITCODE)" }
 
