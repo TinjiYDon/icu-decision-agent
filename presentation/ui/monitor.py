@@ -97,6 +97,17 @@ def _pick_demo_stays(stays: list[dict[str, Any]], hour: int) -> tuple[int | None
 def render_monitor() -> None:
     st.title("ICU 早期恶化预警 · 监测台")
     st.caption("S2 多时刻 · LightGBM + SHAP · 选择住院记录后自动刷新")
+    # 可见版本条：用于确认浏览器连到的是最新代码（非旧进程）
+    st.info("界面版本 **2026-08-02-v3** · 若仍见英文标题，请关掉所有旧 Streamlit 后用 `scripts\\run_console.ps1` 启动")
+
+    # 清掉可能指向 zhixue 的环境变量（本进程内）
+    import os
+
+    for k in ("DATABASE_URL", "SQLALCHEMY_DATABASE_URI"):
+        os.environ.pop(k, None)
+    from infra.config import get_settings
+
+    get_settings.cache_clear()
 
     stays = list(list_stays(limit=800))
     feat_ids = set(_feat_stay_ids(3000))
@@ -135,6 +146,7 @@ def render_monitor() -> None:
                 f"提示：当前库仅有时刻 {hours}（配置为 {cfg_hours}）。"
                 "完整 S2 请 restore `icu_decision_S2-full_*20260802.dump`。"
             )
+        st.caption(f"DB：{get_settings().database_url.split('@')[-1]}")
         st.markdown("### 演示快捷")
         c1, c2 = st.columns(2)
         with c1:

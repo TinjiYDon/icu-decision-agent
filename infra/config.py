@@ -25,11 +25,13 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Prefer configs/database.yaml; ignore polluted shell DATABASE_URL (e.g. zhixue)."""
     db = load_yaml("database.yaml")
     url = db.get("database", {}).get("url")
     if url:
-        return Settings(database_url=url)
-    return Settings()
+        # _env_file=None + explicit kwargs: do not let unrelated project env override
+        return Settings(database_url=url, _env_file=None)
+    return Settings(_env_file=None)
 
 
 def load_yaml(name: str) -> dict[str, Any]:
