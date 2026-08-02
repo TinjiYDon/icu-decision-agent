@@ -1,14 +1,14 @@
 # 执行路线图 ROADMAP_EXEC（人机双可读）
 
-> 更新：2026-07-27 · Wave1/2 底座已交 · dump 可训见 DUMP_READY
+> 更新：2026-08-02 · PR #6（mj）已合 · liujiawei 暂不合
 
 ## 人读摘要
 
 | Wave | 含义 | 状态 | 主责 |
 |------|------|------|------|
-| **1** | 去泄漏特征 + 真三集划分 | ✅ 代码已合 | C |
-| **2** | 全量 `train` + STATUS 写 auc_* | ✅ Owner 代训已填 · B 可复核 | Owner→B |
-| **3** | （智学并行，见 zhixue ROADMAP） | — | — |
+| **1** | 去泄漏特征 + 真三集划分 | ✅ | C |
+| **2** | 全量 train + 分层指标 | ✅ Owner 底座 + **B PR #6** | B/C |
+| **待审计** | `liujiawei` 特征扩展（AUC≈0.89） | ⏸️ 不合 main | B/A |
 
 | 划分 | 比例 | 规则 |
 |------|------|------|
@@ -18,18 +18,19 @@
 
 ```text
 特征契约：configs/features.yaml（denied: hospital_expire_flag, los_hours）
-划分：domain/models/split.py → artifacts/models/split_manifest_mortality_12h.json
-训练：python -m application.train（Wave2：须先 ETL+build_features）
-验收：pytest tests/test_features_leak.py tests/test_predict.py tests/test_mcp_predict.py -q
-禁止：把结局列加回 FEATURE_COLS；用 test 调参
-Issue：S1-3 特征消毒；S1-1 重训 AUC（B）
+划分：domain/models/split.py
+训练：python -m application.train
+验收：pytest tests/test_features_leak.py tests/test_predict.py tests/test_evaluation.py tests/test_train.py -q
+禁止：把结局列加回 FEATURE_COLS；用 test 调参；未审计合入 liujiawei
+Issue：#4 A restore；#3 可关（PR#6）；liujiawei 待审计
 ```
 
-## Wave2 等待清单（队友）
+## Wave2 清单
 
-- [x] Owner：feat/label + train artifact + `P0-full` dump（2026-07-26）
-- [x] B：严格分层复核 + 完整不平衡指标 + 实验笔记（2026-07-31）
-- [ ] A：确认可从新 dump restore（#4）
+- [x] Owner：feat/label + artifact + P0-full dump
+- [x] B：分层复核 · PR #6 merged 2026-08-02
+- [ ] A：dump restore 验收（#4）
+- [ ] `liujiawei`：泄漏/时刻审计通过前 **禁止合 main**
 
 ## Owner 可代备（Wave2 数据底座 · 非 PPO）
 

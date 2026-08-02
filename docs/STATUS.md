@@ -41,9 +41,11 @@
 
 **结论：full dump 已能稳定复现弱基线；当前特征和标签精度不足以支持临床部署。**
 
-## GitHub PR（2026-07-27 查）
+## GitHub（2026-08-02）
 
-- 无 open PR；Issue #3/#4 仍开（B/A 复核）
+- ✅ [PR #6](https://github.com/TinjiYDon/icu-decision-agent/pull/6) mj 已合
+- 🔔 Issue #4 A restore 仍开
+- ⏸️ 分支 `liujiawei` **不合**（待泄漏审计）
 
 ## 验证
 

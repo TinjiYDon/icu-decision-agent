@@ -1,47 +1,46 @@
-# 任务 Backlog（垂直切片）
+# ?? Backlog??????
 
-复制�?GitHub Issue，标签见 CONTRIBUTING.md�?
-
----
-
-## S0 · 数据检查点 �?
-
-- [x] #S0-1 ETL 94k stays + dump + 冒烟（成�?A�?
+??? GitHub Issue???? CONTRIBUTING.md?
 
 ---
 
-## S1 · 训练闭环
+## S0 � ????? ?
 
-- [ ] **#S1-1** 成员 B：`application.train` 全量跑通，`auc_val`/`auc_test`/阳性率写入 STATUS�?*Wave2**�?
-- [ ] **#S1-2** 成员 A：feat/label + �?schemas_only dump
-- [x] **#S1-3** 成员 C：去除泄漏特�?+ 真三集划分（**Wave1** �?2026-07-25�?
+- [x] #S0-1 ETL 94k stays + dump + ????? A?
 
 ---
 
-## S2 · 单患者预�?
+## S1 � ????
 
-- [x] **#S2-1** 成员 B：`domain/models/lgbm.py` · `predict_stay(stay_id)` ✅（C 联调落地�?
-- [x] **#S2-2** 成员 C：`application/predict_patient.py` L4 + 缓存 �?
-- [x] **#S2-2b** SHAP/booster 缓存、`score_kind` 展示（C 加固 ✅）
-
----
-
-## S3 · Streamlit 演示
-
-- [x] **#S3-1** 成员 C：`presentation/streamlit_app.py` �?stay �?风险�?+ Top 因素 �?
-  - 验证：`streamlit run presentation/streamlit_app.py`
-  - 禁止：页面内 SQL / 直接 import domain
+- [x] **#S1-1** ?? train + AUC ? STATUS?Owner ?? + **B ?????? PR #6** � 2026-08-02?
+- [x] **#S1-2** feat/label + ? schemas_only dump?Owner `P0-full` 20260726?**A ?? restore ??** � Issue #4?
+- [x] **#S1-3** ?????? + ??????**Wave1** ? 2026-07-25?
+- [ ] **#S1-4** ?? `liujiawei` ??????? AUC?0.89?? **???**????/???????
 
 ---
 
-## S4 · MCP（P2�?
+## S2 � ?????
 
-- [x] **#S4-1** 成员 C：MCP server 包装 L4 `predict_risk`（骨�?�?2026-07-22�? 
-- [ ] **#S4-2** 成员 B：JSON schema 文档写入 INNOVATION_ROADMAP（可对照 `presentation/mcp_tools.py` PREDICT_RISK_SCHEMA�?
+- [x] **#S2-1** `domain/models/lgbm.py` � `predict_stay(stay_id)` ?
+- [x] **#S2-2** `application/predict_patient.py` L4 + ?? ?
+- [x] **#S2-2b** SHAP/booster ???`score_kind` ?? ?
 
 ---
 
-## 基础设施（贯穿）
+## S3 � Streamlit ??
 
-- [ ] **#INF-1** 成员 A：CI �?pytest（GitHub Actions 可选）  
-- [ ] **#INF-2** 成员 C：PR 合并 checklist 执行
+- [x] **#S3-1** `presentation/streamlit_app.py` ?
+
+---
+
+## S4 � MCP?P2?
+
+- [x] **#S4-1** MCP `predict_risk` ?? ?
+- [ ] **#S4-2** ?? B?JSON schema ???? INNOVATION_ROADMAP
+
+---
+
+## ????
+
+- [ ] **#INF-1** ?? A?CI ? pytest????
+- [ ] **#INF-2** ?? C?PR ?? checklist ??
