@@ -15,33 +15,33 @@ STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
 
 
 def render_accept() -> None:
-    st.title("Acceptance gates")
-    st.caption("Layer1 dump counts + model artifact metrics")
+    st.title("验收门禁")
+    st.caption("Layer1 dump 行数 + 模型指标 artifact")
 
     try:
         counts = layer1_counts()
         g1, g2, g3, g4 = st.columns(4)
-        g1.metric("feat_rows", f"{counts['feat_rows']:,}")
-        g2.metric("label_rows", f"{counts['label_rows']:,}")
-        g3.metric("stays", f"{counts['stay_count']:,}")
-        g4.metric("gate", counts["status"])
+        g1.metric("特征行数", f"{counts['feat_rows']:,}")
+        g2.metric("标签行数", f"{counts['label_rows']:,}")
+        g3.metric("住院数", f"{counts['stay_count']:,}")
+        g4.metric("门禁", counts["status"])
         st.json({"by_hour": counts["by_hour"], "expected_hours": counts["expected_hours"]})
         if counts["gate_ok"]:
-            st.success("S2 row-count gate passed (~472k × 5 hours)")
+            st.success("S2 行数门禁通过（约 472k × 5 时刻）")
         else:
-            st.error("Gate failed — restore icu_decision_S2-full_*20260802.dump")
+            st.error("门禁失败 — 请 restore icu_decision_S2-full_*20260802.dump")
     except Exception as exc:  # noqa: BLE001
-        st.error(f"Layer1 query failed: {exc}")
+        st.error(f"无法查询 Layer1：{exc}")
 
     metrics = load_metrics_artifact()
     if not metrics:
-        st.warning("Missing artifacts/models/metrics_mortality_12h.json")
+        st.warning("缺少 artifacts/models/metrics_mortality_12h.json，请先训练")
     else:
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("PR-AUC test", f"{metrics.get('pr_auc_test', 0):.3f}")
-        m2.metric("Brier test", f"{metrics.get('brier_test', 0):.3f}")
-        m3.metric("ROC test (ref)", f"{metrics.get('auc_test', 0):.3f}")
-        m4.metric("Operating thr", f"{metrics.get('operating_threshold', 0):.3f}")
+        m1.metric("PR-AUC（测试）", f"{metrics.get('pr_auc_test', 0):.3f}")
+        m2.metric("Brier（测试）", f"{metrics.get('brier_test', 0):.3f}")
+        m3.metric("ROC（对照）", f"{metrics.get('auc_test', 0):.3f}")
+        m4.metric("工作点阈值", f"{metrics.get('operating_threshold', 0):.3f}")
         by_h = metrics.get("metrics_by_hour_test") or {}
         if by_h:
             rows = []
@@ -69,12 +69,12 @@ def render_accept() -> None:
                     use_container_width=True,
                 )
         if op.get("confusion_matrix"):
-            st.subheader("Confusion @ operating point")
+            st.subheader("混淆矩阵（工作点）")
             st.json(op["confusion_matrix"])
 
-    with st.expander("STATUS.md"):
+    with st.expander("项目状态 STATUS.md"):
         if STATUS.exists():
             st.markdown(STATUS.read_text(encoding="utf-8"))
         else:
-            st.info("No STATUS.md")
+            st.info("无 STATUS.md")
     disclaimer()

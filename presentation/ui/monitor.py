@@ -1,4 +1,4 @@
-"""Monitor page: patient workspace with auto-predict + Plotly."""
+"""监测页：选患者即预测 + Plotly。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+from sqlalchemy import text
 
 from application.predict_patient import (
     list_stays,
@@ -13,26 +14,43 @@ from application.predict_patient import (
     predict_patient_trajectory,
 )
 from domain.features.build import prediction_hours
+from infra.db import get_engine
 from presentation.ui.charts import fig_risk_trajectory, fig_shap_bars
-from presentation.ui.theme import disclaimer, risk_badge_html
+from presentation.ui.theme import disclaimer, risk_badge_html, status_message
 
-VITAL_KEYS = [
-    "vital_heart_rate",
-    "vital_resp_rate",
-    "vital_temp",
-    "vital_nbps",
-    "lab_lactate",
-    "lab_ph",
-    "shock_index",
-    "spo2_fio2_ratio",
-]
+VITAL_LABELS = {
+    "vital_heart_rate": "心率",
+    "vital_resp_rate": "呼吸",
+    "vital_temp": "体温",
+    "vital_nbps": "血压",
+    "lab_lactate": "乳酸",
+    "lab_ph": "pH",
+    "shock_index": "休克指数",
+    "spo2_fio2_ratio": "SpO2/FiO2",
+}
 
 
 def _stay_options(stays: list[dict[str, Any]]) -> dict[str, int]:
     return {
-        f"stay {s['stay_id']} · LOS {float(s.get('los_hours') or 0):.1f}h": int(s["stay_id"])
+        f"住院 {s['stay_id']} · 住院时长 {float(s.get('los_hours') or 0):.1f} 小时": int(
+            s["stay_id"]
+        )
         for s in stays
     }
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _feat_stay_ids(limit: int = 2000) -> tuple[int, ...]:
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT DISTINCT stay_id FROM feat.sample_matrix "
+                "ORDER BY stay_id LIMIT :lim"
+            ),
+            {"lim": int(limit)},
+        ).fetchall()
+    return tuple(int(r[0]) for r in rows)
 
 
 @st.cache_data(show_spinner=False, ttl=300)
@@ -46,7 +64,6 @@ def _cached_traj(stay_id: int) -> dict[str, Any]:
 
 
 def _pick_demo_stays(stays: list[dict[str, Any]], hour: int) -> tuple[int | None, int | None]:
-    """Scan a shortlist for high/low risk demos (cached via session)."""
     key = f"demo_pick_h{hour}"
     if key in st.session_state:
         return st.session_state[key]
@@ -64,17 +81,20 @@ def _pick_demo_stays(stays: list[dict[str, Any]], hour: int) -> tuple[int | None
 
 
 def render_monitor() -> None:
-    st.title("ICU Early-Warning Monitor")
-    st.caption("S2 multi-hour · LightGBM + SHAP · select a stay to refresh")
+    st.title("ICU 早期恶化预警 · 监测台")
+    st.caption("S2 多时刻 · LightGBM + SHAP · 选择住院记录后自动刷新")
 
-    stays = list(list_stays(limit=500))
+    stays = list(list_stays(limit=800))
+    feat_ids = set(_feat_stay_ids(3000))
+    if feat_ids:
+        stays = [s for s in stays if int(s["stay_id"]) in feat_ids] or stays
     if not stays:
-        st.warning("No ICU stays. Restore S2 dump or run ETL.")
+        st.warning("未找到 ICU 住院记录。请先 restore S2 dump 或运行 ETL。")
         st.stop()
 
     hours = prediction_hours()
     with st.sidebar:
-        st.markdown("### Patient")
+        st.markdown("### 患者")
         options = _stay_options(stays)
         labels = list(options.keys())
         default_ix = 0
@@ -84,40 +104,40 @@ def render_monitor() -> None:
                 if options[lab] == fid:
                     default_ix = i
                     break
-        choice = st.selectbox("ICU stay", labels, index=default_ix, key="mon_stay")
+        choice = st.selectbox("ICU 住院（stay）", labels, index=default_ix, key="mon_stay")
         stay_id = options[choice]
         hour = st.selectbox(
-            "Prediction hour",
+            "预测时刻（入科后小时）",
             hours,
             index=min(1, len(hours) - 1),
             key="mon_hour",
         )
-        st.markdown("### Demo shortcuts")
+        st.markdown("### 演示快捷")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("High-risk sample", use_container_width=True):
-                with st.spinner("Scanning shortlist…"):
+            if st.button("高风险样例", use_container_width=True, type="primary"):
+                with st.spinner("正在扫描样例…"):
                     hi, _ = _pick_demo_stays(stays, int(hour))
                 if hi is not None:
                     st.session_state["force_stay_id"] = hi
                     st.rerun()
                 else:
-                    st.warning("No scored sample")
+                    st.warning("未找到可评分样例")
         with c2:
-            if st.button("Low-risk sample", use_container_width=True):
-                with st.spinner("Scanning shortlist…"):
+            if st.button("低风险样例", use_container_width=True, type="primary"):
+                with st.spinner("正在扫描样例…"):
                     _, lo = _pick_demo_stays(stays, int(hour))
                 if lo is not None:
                     st.session_state["force_stay_id"] = lo
                     st.rerun()
                 else:
-                    st.warning("No scored sample")
+                    st.warning("未找到可评分样例")
 
     result = _cached_predict(stay_id, int(hour))
     traj = _cached_traj(stay_id)
 
     if result.get("status") != "ok":
-        st.error(result.get("message", result.get("status")))
+        st.error(status_message(result))
         disclaimer()
         return
 
@@ -136,23 +156,27 @@ def render_monitor() -> None:
         st.markdown("")
         feats = result.get("features") or {}
         cols = st.columns(4)
-        for i, k in enumerate(VITAL_KEYS[:8]):
+        for i, k in enumerate(list(VITAL_LABELS)[:8]):
             with cols[i % 4]:
                 v = feats.get(k)
                 try:
                     txt = f"{float(v):.2f}" if v is not None else "—"
                 except (TypeError, ValueError):
                     txt = str(v)
-                st.metric(k.replace("vital_", "").replace("lab_", ""), txt)
+                st.metric(VITAL_LABELS[k], txt)
 
     with right:
-        pts = [p for p in traj.get("points", []) if p.get("status") == "ok" and p.get("risk_score") is not None]
+        pts = [
+            p
+            for p in traj.get("points", [])
+            if p.get("status") == "ok" and p.get("risk_score") is not None
+        ]
         if pts:
             st.plotly_chart(fig_risk_trajectory(pts), use_container_width=True)
         else:
-            st.info("Trajectory unavailable for this stay")
+            st.info("该住院暂无多时刻轨迹")
 
-    st.subheader("Explainability")
+    st.subheader("可解释性（SHAP）")
     factors = result.get("top_factors") or []
     if factors:
         c_a, c_b = st.columns([1.2, 1])
@@ -160,9 +184,9 @@ def render_monitor() -> None:
             st.plotly_chart(fig_shap_bars(factors), use_container_width=True)
         with c_b:
             st.dataframe(pd.DataFrame(factors), use_container_width=True, hide_index=True)
-            with st.expander("Full feature vector"):
+            with st.expander("完整特征向量"):
                 st.json(feats)
     else:
-        st.caption("No SHAP factors")
+        st.caption("无 SHAP 因子")
 
     disclaimer()

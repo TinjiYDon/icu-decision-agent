@@ -20,8 +20,8 @@ LABELS_YAML = ROOT / "configs" / "labels.yaml"
 
 
 def render_tune() -> None:
-    st.title("Tuning & retrain")
-    st.caption("Write recommend thresholds / default hour, then train --from-existing")
+    st.title("调参与重训")
+    st.caption("写入建议阈值 / 默认时刻后，使用 --from-existing 重训（不碰 Layer0）")
 
     feat_cfg = load_yaml("features.yaml")
     lab_cfg = load_yaml("labels.yaml")
@@ -36,7 +36,7 @@ def render_tune() -> None:
         hour_index = st.number_input("features.hour_index", 0, 24, default_h, 1)
         st.caption(f"S2 prediction_hours = {feat_cfg.get('prediction_hours')}")
 
-    if st.button("Save YAML", type="primary"):
+    if st.button("保存配置", type="primary"):
         feat_cfg["hour_index"] = int(hour_index)
         FEATURES_YAML.write_text(
             yaml.safe_dump(feat_cfg, allow_unicode=True, sort_keys=False),
@@ -52,11 +52,11 @@ def render_tune() -> None:
             yaml.safe_dump(lab_cfg, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
-        st.success("Wrote configs/features.yaml and configs/labels.yaml")
+        st.success("已写入 configs/features.yaml 与 configs/labels.yaml")
 
     st.divider()
-    if st.button("Train --from-existing"):
-        with st.spinner("Training…"):
+    if st.button("运行训练 --from-existing"):
+        with st.spinner("训练中…"):
             env = os.environ.copy()
             env["PYTHONPATH"] = str(ROOT)
             proc = subprocess.run(
@@ -70,7 +70,7 @@ def render_tune() -> None:
         if proc.returncode != 0:
             st.error(proc.stderr or f"exit {proc.returncode}")
         else:
-            st.success("Train OK — open Accept for metrics")
+            st.success("训练完成 — 请打开「验收」查看指标")
             try:
                 st.json(json.loads(proc.stdout))
             except json.JSONDecodeError:

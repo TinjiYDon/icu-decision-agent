@@ -28,9 +28,9 @@ def fig_risk_trajectory(points: Sequence[dict[str, Any]]) -> go.Figure:
         )
     )
     fig.update_layout(
-        title="Multi-hour risk curve (S2 grid)",
-        xaxis_title="hour_index (hours after ICU intime)",
-        yaxis_title="12h mortality risk",
+        title="多时刻风险曲线（S2 网格）",
+        xaxis_title="预测时刻 hour_index（入科后小时）",
+        yaxis_title="12 小时死亡风险",
         yaxis=dict(range=[0, max(0.25, max(ys) * 1.25 if ys else 0.25)]),
         margin=dict(l=40, r=20, t=48, b=40),
         height=320,
@@ -57,8 +57,8 @@ def fig_shap_bars(top_factors: Sequence[dict[str, Any]]) -> go.Figure:
         )
     )
     fig.update_layout(
-        title="Top SHAP contributions",
-        xaxis_title="SHAP value",
+        title="主要影响因素（SHAP）",
+        xaxis_title="SHAP 贡献值",
         margin=dict(l=40, r=20, t=48, b=40),
         height=max(280, 48 * len(names) + 80),
         paper_bgcolor="rgba(0,0,0,0)",
@@ -91,9 +91,9 @@ def fig_calibration(mean_predicted: Sequence[float], fraction_positive: Sequence
         )
     )
     fig.update_layout(
-        title="Calibration (test @ operating threshold)",
-        xaxis_title="Mean predicted",
-        yaxis_title="Fraction positive",
+        title="校准曲线（测试集 · 工作点）",
+        xaxis_title="平均预测概率",
+        yaxis_title="实际阳性比例",
         xaxis=dict(range=[0, 1]),
         yaxis=dict(range=[0, 1]),
         height=320,
