@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install pytest pyyaml lightgbm scikit-learn pandas numpy pydantic httpx sqlalchemy "psycopg[binary]" pydantic-settings
+      - name: Unit tests (no DB)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/test_smoke.py tests/test_features_leak.py tests/test_evaluation.py tests/test_predict.py tests/test_train.py tests/test_mcp_predict.py -q --tb=line
