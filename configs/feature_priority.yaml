@@ -1,0 +1,116 @@
+# Feature priority for collinearity handling
+# When two features have |correlation| > 0.8, keep the one with higher priority.
+# Priority: clinical gold standard > composite score > single measurement
+
+priority:
+  # ── 复合评分（最高优先级） ──
+  sofa_total: 100
+  sofa_respiration: 95
+  sofa_coagulation: 95
+  sofa_liver: 95
+  sofa_cardiovascular: 95
+  sofa_neurological: 95
+  sofa_renal: 95
+  gcs_total: 90
+  spo2_fio2_ratio: 88
+  pf_ratio: 87
+  shock_index: 85
+
+  # ── 核心临床指标 ──
+  lab_lactate: 80
+  lab_ph: 75
+  lab_albumin: 75
+  lab_inr: 73
+  anchor_age: 72
+  lab_bun: 70
+  lab_creatinine: 70
+  lab_potassium: 68
+  vital_heart_rate: 65
+  vital_nbps: 65
+  vital_nbpm: 63
+  vital_temp: 62
+  vital_resp_rate: 60
+  vital_spo2: 60
+  vital_fio2: 58
+  pao2: 57
+  paco2: 56
+  lab_bicarbonate: 55
+  lab_sodium: 55
+  lab_bilirubin: 53
+  lab_glucose: 50
+  lab_hemoglobin: 48
+  lab_platelets: 48
+  lab_hematocrit: 45
+  lab_wbc: 45
+  lab_chloride: 42
+  lab_calcium: 40
+  lab_magnesium: 38
+
+  # ── 治疗标志 ──
+  vasopressor_1h: 70
+  vent_flag: 68
+  intubation_flag: 65
+
+  # ── GCS 子项（低于 gcs_total） ──
+  gcs_eye: 60
+  gcs_verbal: 60
+  gcs_motor: 60
+  vital_gcs_total: 55
+
+  # ── 合并症（Elixhauser） ──
+  elix_congestive_heart_failure: 50
+  elix_cardiac_arrhythmias: 48
+  elix_renal_failure: 48
+  elix_liver_disease: 46
+  elix_coagulopathy: 45
+  elix_metastatic_cancer: 45
+  elix_diabetes_complicated: 42
+  elix_chronic_pulmonary: 40
+  elix_neurological_disorders: 40
+  elix_peripheral_vascular: 38
+  elix_hypertension_complicated: 38
+  elix_paralysis: 36
+  elix_solid_tumor: 35
+  elix_fluid_electrolyte: 35
+  elix_weight_loss: 33
+  elix_valvular_disease: 32
+  elix_pulmonary_circulation: 32
+  elix_hypertension_uncomplicated: 30
+  elix_obesity: 28
+  elix_hypothyroidism: 28
+  elix_diabetes_uncomplicated: 26
+  elix_deficiency_anemia: 25
+  elix_alcohol_abuse: 25
+  elix_drug_abuse: 24
+  elix_psychoses: 22
+  elix_depression: 22
+  elix_lymphoma: 20
+  elix_peptic_ulcer: 18
+  elix_rheumatoid_arthritis: 18
+  elix_blood_loss_anemia: 15
+
+  # ── 入院信息 ──
+  pre_icu_los_hours: 55
+  careunit_other: 50
+  careunit_micu: 30
+  careunit_sicu: 30
+  careunit_ccu: 30
+  admit_type_emergency: 25
+  admit_from_ed: 25
+  admit_from_transfer: 25
+  admit_type_urgent: 22
+  admit_type_elective: 22
+  insurance_medicare: 15
+  insurance_medicaid: 15
+  insurance_private: 15
+  gender_m: 20
+
+  # ── 遗传病标志 ──
+  has_q_code: 10
+  has_congenital_heart: 10
+  has_family_ihd: 10
+
+  # ── 冗余体征（低优先级，被衍生特征替代） ──
+  vital_nbpd: 30
+  vital_peep: 28
+  abg_fio2: 25

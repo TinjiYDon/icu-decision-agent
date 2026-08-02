@@ -1,4 +1,4 @@
-"""LightGBM trainer for P0 tabular mortality model (admission-time features)."""
+"""LightGBM trainer for S1 early-warning mortality model (t=intime+offset)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 
 import lightgbm as lgb
+import numpy as np
 import pandas as pd
 from sqlalchemy import text
 
-from domain.features.build import FEATURE_COLS
+from domain.features.build import FEATURE_COLS, prediction_hour_index
 from domain.models.evaluation import binary_metrics, select_threshold_by_f1
 from domain.models.split import save_split_manifest, split_frame_by_stay
 from infra.config import load_yaml
@@ -20,19 +21,25 @@ ARTIFACT_DIR = ROOT / "artifacts" / "models"
 
 
 def _load_training_frame() -> pd.DataFrame:
+    hour_index = prediction_hour_index()
     engine = get_engine()
     sql = """
         SELECT f.stay_id, f.feature_json, l.label
         FROM feat.sample_matrix f
         JOIN label.mortality_12h l ON f.stay_id = l.stay_id AND f.hour_index = l.hour_index
-        WHERE f.hour_index = 0
+        WHERE f.hour_index = :hour_index
     """
     with engine.connect() as conn:
-        rows = conn.execute(text(sql)).mappings().all()
+        rows = conn.execute(text(sql), {"hour_index": hour_index}).mappings().all()
     records = []
     for row in rows:
         feat = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
-        rec = {c: feat.get(c, 0) for c in FEATURE_COLS}
+        rec = {}
+        for c in FEATURE_COLS:
+            v = feat.get(c, 0)
+            if v is None:
+                v = np.nan
+            rec[c] = v
         rec["label"] = int(row["label"])
         rec["stay_id"] = row["stay_id"]
         records.append(rec)
@@ -155,15 +162,15 @@ def _load_feature_row(stay_id: int) -> dict | None:
             text(
                 """
                 SELECT feature_json FROM feat.sample_matrix
-                WHERE stay_id = :stay_id AND hour_index = 0
+                WHERE stay_id = :stay_id AND hour_index = :hour_index
                 """
             ),
-            {"stay_id": stay_id},
+            {"stay_id": stay_id, "hour_index": prediction_hour_index()},
         ).mappings().first()
     if not row:
         return None
     feat = row["feature_json"] if isinstance(row["feature_json"], dict) else json.loads(row["feature_json"])
-    return {c: feat.get(c, 0) for c in FEATURE_COLS}
+    return {c: (feat.get(c, 0) if feat.get(c) is not None else 0) for c in FEATURE_COLS}
 
 
 def recommend_action(risk_score: float, score_kind: str = "probability") -> dict:

@@ -1,48 +1,27 @@
-# 执行路线图 ROADMAP_EXEC（人机双可读）
+# 执行路线图 ROADMAP_EXEC
 
-> 更新：2026-08-02 · PR #6（mj）已合 · liujiawei 暂不合
+> 更新：2026-08-02 · **S1 已训出多指标** · 可演进 S2
 
 ## 人读摘要
 
-| Wave | 含义 | 状态 | 主责 |
-|------|------|------|------|
-| **1** | 去泄漏特征 + 真三集划分 | ✅ | C |
-| **2** | 全量 train + 分层指标 | ✅ Owner 底座 + **B PR #6** | B/C |
-| **待审计** | `liujiawei` 特征扩展（AUC≈0.89） | ⏸️ 不合 main | B/A |
-
-| 划分 | 比例 | 规则 |
+| Wave | 含义 | 状态 |
 |------|------|------|
-| train/val/test | 0.7/0.1/0.2 | stay_id · seed=42 · 禁止合并 val+test |
+| 1–2 | 6-feat 弱基线对照 | ✅ |
+| **S1** | `t=intime+1h` + 扩展特征 | ✅ PR-AUC≈0.15 · ROC≈0.77 |
+| **S2** | 多时刻流式样本 | 未开（offset 契约已定） |
 
 ## Agent 上下文
 
 ```text
-特征契约：configs/features.yaml（denied: hospital_expire_flag, los_hours）
-划分：domain/models/split.py
-训练：python -m application.train
-验收：pytest tests/test_features_leak.py tests/test_predict.py tests/test_evaluation.py tests/test_train.py -q
-禁止：把结局列加回 FEATURE_COLS；用 test 调参；未审计合入 liujiawei
-Issue：#3/#4 已关；liujiawei 见 LIUJIAWEI_HOLD.md（L3 不合）
+契约：hour_index=1 · prediction_offset_hours=1
+训练：Layer0 @ :5432 · python -m application.train
+主指标：PR-AUC / Brier / 工作点；ROC 对照
+禁止：单报 ROC；merge 裸 liujiawei
 ```
 
-## Wave2 清单
+## 清单
 
-- [x] Owner：feat/label + artifact + P0-full dump
-- [x] B：分层复核 · PR #6 merged 2026-08-02
-- [x] Owner：dump restore 签收（#4 · 94458 · AUC 0.673/0.693）
-- [ ] `liujiawei`：按 [`LIUJIAWEI_HOLD.md`](LIUJIAWEI_HOLD.md) 一次干净 PR 前 **禁止合 main**
-
-## Owner 可代备（Wave2 数据底座 · 非 PPO）
-
-前置：Docker/本机 PG + Layer0 `mimic`（或 demo）已导入；`configs/database.yaml` 指向正确 DSN。
-
-```powershell
-$env:PYTHONPATH = (Get-Location)
-.\scripts\bootstrap_from_dump.ps1   # 或 restore 后跳过
-.\.venv\Scripts\python.exe -m application.run_etl_stage
-.\.venv\Scripts\python.exe -m application.train   # 内含 build_features + labels + lgbm
-.\scripts\export_layer1.ps1 -MimicSource mimic    # 导出含数据的 Layer1；勿只依赖误导性文件名
-```
-
-产物：`feat.sample_matrix` · `label.mortality_12h` · `artifacts/models/lgbm_*` · 新 `dumps/` + `DATA_VERSION_*.json`  
-**不做**：代 B 改 STATUS 叙事而不跑可复现命令；把总 LOS / expire 加回特征。
+- [x] S1 特征/标签重建 + STATUS
+- [x] 对照 Wave2 写入 STATUS
+- [ ] S1 PR merge
+- [ ] S2 h 网格（后续）

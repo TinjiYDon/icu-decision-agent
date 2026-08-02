@@ -1,25 +1,41 @@
-# Feature contract for mortality_12h (admission-time / hour_index=0)
-# Owner: C maintains allow/deny; B must not add denied columns without Issue.
+# S1 early-warning contract: prediction at intime + prediction_offset_hours
+# S2-ready: same allowed columns; vary hour_index / offset per sample later.
 
 task: mortality_12h
-hour_index: 0
+hour_index: 1
+prediction_offset_hours: 1
 anchor: icu_intime
 
 allowed:
+  # Model-A refined set (training FEATURE_COLS)
   - anchor_age
-  - gender_m
-  - careunit_micu
-  - careunit_sicu
-  - careunit_ccu
   - careunit_other
+  - vital_temp
+  - vital_gcs_total
+  - vital_fio2
+  - vital_heart_rate
+  - vital_nbps
+  - vital_resp_rate
+  - lab_lactate
+  - lab_bun
+  - lab_ph
+  - lab_potassium
+  - lab_inr
+  - lab_albumin
+  - pre_icu_los_hours
+  - gcs_total
+  - vasopressor_1h          # treatment exposure within window; document in STATUS
+  - shock_index
+  - spo2_fio2_ratio
 
 denied:
-  - hospital_expire_flag   # outcome leak
-  - los_hours              # total LOS from outtime; not known at admission
+  - hospital_expire_flag
+  - los_hours
   - dod
   - outtime
 
 notes: |
-  At hour_index=0 only admission-known features.
-  Stage-2 labs/vitals must use charttime <= prediction time (B+A).
-  Wave2: B retrain after feature rebuild and write AUC to STATUS.
+  S1: t = intime + 1h; features with charttime <= t (pre-ICU labs preferred).
+  Label: death in [t, t+12h]. Not admission-instant triage.
+  Baseline contrast: Wave2 6-feat hour_index=0 remains historical (STATUS).
+  S2: parameterize offset and emit multiple hour_index rows per stay.

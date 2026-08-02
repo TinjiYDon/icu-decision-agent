@@ -2,9 +2,11 @@
 
 > 本仓库独立演进；MCP 仅作为对外标准接口，不与其他 ICU 项目耦合。
 
-## 目标
+## 目标（实时落地）
 
-**可解释临床恶化预警**：MIMIC 时序 ETL → LightGBM 风险分 → SHAP 归因 → 人机协同建议。
+**ICU 早期恶化预警**：在预测时刻 `t`（S1：`intime+1h`）使用床旁可得 vitals/labs → LightGBM 风险分 → SHAP → 人机建议。
+
+入科瞬间 6 特征弱基线仅作**对照**，不再作为产品主叙事。
 
 ## 里程碑
 
@@ -13,17 +15,16 @@
 | **P0** ✓ | Demo 跑通 | ETL + LightGBM + dump |
 | **P1** ✓ | 可解释 Demo | Streamlit + SHAP |
 | **P2** ✓ 骨架 | 标准接口 | MCP `predict_risk` |
+| **S1** | 实时早期预警切片 | `hour_index=1` + 扩展特征 + **多指标** |
+| **S2** | 多时刻流式样本 | 同一 `prediction_time` API，h 网格 |
 | **P3** | 时序升级 | GRU-D / TFT（未做） |
-| **P4** | 互操作（可选） | FHIR |
 
-## 当前重点（2026-07-27）
+## 评测（投刊/答辩）
 
-1. ✅ Wave1 无泄漏特征 + 真三集；Owner 全量训 auc_val≈0.711 / auc_test≈0.682
-2. ✅ **P0-full dump 可训**：见 [`DUMP_READY.md`](DUMP_READY.md)（线下分发）
-3. ✅ 本地调参：Streamlit + MLflow · [`TUNING_LOCAL.md`](TUNING_LOCAL.md)
-4. B：复核 AUC / 实验笔记（#3）；A：restore 验证（#4）
-5. **不做** online PPO；时序见 P3
+主报：**PR-AUC、Brier、工作点 Precision/Recall**；ROC-AUC 仅对照。禁止单报 ROC。
 
-## 扩展方向
+## 当前重点
 
-- MCP / 推理服务容器化（生产阶段）
+1. S1 契约与 Layer0 重建训练（本机 5432 `mimic`）
+2. 对照 Wave2 6-feat 基线写入 STATUS
+3. S2：参数化 offset 已预留（`prediction_offset_hours`）
