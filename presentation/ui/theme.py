@@ -110,7 +110,7 @@ BAND_CLASS = {
 
 STATUS_ZH = {
     "no_model": "尚未训练模型。请先运行：python -m application.train --from-existing",
-    "no_features": "该 stay 在 feat.sample_matrix 中无特征。请 restore S2 dump，或换一个 stay / 预测时刻。",
+    "no_features": "该 stay 在所选预测时刻无特征。请改选时刻，或 restore S2 dump（需含 h=0,1,2,4,6）。",
     "ok": "ok",
 }
 

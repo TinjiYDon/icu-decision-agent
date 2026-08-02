@@ -39,7 +39,7 @@ def _stay_options(stays: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=60)
 def _feat_stay_ids(limit: int = 2000) -> tuple[int, ...]:
     engine = get_engine()
     with engine.connect() as conn:
@@ -53,12 +53,26 @@ def _feat_stay_ids(limit: int = 2000) -> tuple[int, ...]:
     return tuple(int(r[0]) for r in rows)
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=60)
+def _hours_for_stay(stay_id: int) -> tuple[int, ...]:
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT hour_index FROM feat.sample_matrix "
+                "WHERE stay_id = :sid ORDER BY hour_index"
+            ),
+            {"sid": int(stay_id)},
+        ).fetchall()
+    return tuple(int(r[0]) for r in rows)
+
+
+@st.cache_data(show_spinner=False, ttl=60)
 def _cached_predict(stay_id: int, hour_index: int) -> dict[str, Any]:
     return predict_patient(int(stay_id), hour_index=int(hour_index))
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=60)
 def _cached_traj(stay_id: int) -> dict[str, Any]:
     return predict_patient_trajectory(int(stay_id))
 
@@ -92,7 +106,7 @@ def render_monitor() -> None:
         st.warning("未找到 ICU 住院记录。请先 restore S2 dump 或运行 ETL。")
         st.stop()
 
-    hours = prediction_hours()
+    cfg_hours = prediction_hours()
     with st.sidebar:
         st.markdown("### 患者")
         options = _stay_options(stays)
@@ -106,12 +120,21 @@ def render_monitor() -> None:
                     break
         choice = st.selectbox("ICU 住院（stay）", labels, index=default_ix, key="mon_stay")
         stay_id = options[choice]
+        avail = list(_hours_for_stay(stay_id))
+        hours = avail if avail else list(cfg_hours)
+        # 优先 h=1（S2 主叙事）；若库中只有 h=0 则自动回退
+        prefer = 1 if 1 in hours else hours[0]
         hour = st.selectbox(
             "预测时刻（入科后小时）",
             hours,
-            index=min(1, len(hours) - 1),
-            key="mon_hour",
+            index=hours.index(prefer),
+            key=f"mon_hour_{stay_id}",
         )
+        if set(hours) != set(cfg_hours):
+            st.caption(
+                f"提示：当前库仅有时刻 {hours}（配置为 {cfg_hours}）。"
+                "完整 S2 请 restore `icu_decision_S2-full_*20260802.dump`。"
+            )
         st.markdown("### 演示快捷")
         c1, c2 = st.columns(2)
         with c1:
