@@ -2,7 +2,9 @@
 primary:
   name: mortality_12h
   horizon_hours: 12
-  event: icu_death   # 未来 horizon 内 ICU/院内死亡，定义在 domain/labels 实现
+  # Window starts at prediction time t=intime+features.prediction_offset_hours (S1)
+  event: death_from_prediction_time
+  note: "S1 label in [t, t+12h]; not from intime alone"
 
 horizons_hours: [4, 8, 12, 24]
 

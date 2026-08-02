@@ -1,0 +1,152 @@
+# Feature groups for ablation experiments
+# Each group represents a clinical system; used by scripts/feature_selection.py ablation
+
+groups:
+  demographics:
+    description: "人口学基线"
+    features:
+      - anchor_age
+      - gender_m
+      - careunit_micu
+      - careunit_sicu
+      - careunit_ccu
+      - careunit_other
+
+  cardiovascular:
+    description: "心血管系统"
+    features:
+      - vital_heart_rate
+      - vital_nbps
+      - vital_nbpd
+      - vital_nbpm
+      - shock_index
+      - vasopressor_1h
+      - sofa_cardiovascular
+
+  respiratory:
+    description: "呼吸系统"
+    features:
+      - vital_resp_rate
+      - vital_spo2
+      - vital_fio2
+      - vital_peep
+      - spo2_fio2_ratio
+      - vent_flag
+      - pao2
+      - paco2
+      - abg_fio2
+      - pf_ratio
+      - sofa_respiration
+
+  neurological:
+    description: "神经系统"
+    features:
+      - vital_gcs_total
+      - gcs_total
+      - gcs_eye
+      - gcs_verbal
+      - gcs_motor
+      - intubation_flag
+      - sofa_neurological
+
+  renal:
+    description: "肾脏系统"
+    features:
+      - lab_creatinine
+      - lab_bun
+      - sofa_renal
+
+  hepatic:
+    description: "肝胆系统"
+    features:
+      - lab_bilirubin
+      - lab_albumin
+      - sofa_liver
+
+  hematologic:
+    description: "血液/凝血系统"
+    features:
+      - lab_inr
+      - lab_platelets
+      - lab_hemoglobin
+      - lab_hematocrit
+      - sofa_coagulation
+
+  metabolic:
+    description: "代谢/电解质/酸碱"
+    features:
+      - lab_lactate
+      - lab_ph
+      - lab_potassium
+      - lab_sodium
+      - lab_chloride
+      - lab_bicarbonate
+      - lab_glucose
+      - lab_calcium
+      - lab_magnesium
+      - vital_temp
+
+  comorbidity:
+    description: "Elixhauser合并症"
+    features:
+      - elix_congestive_heart_failure
+      - elix_cardiac_arrhythmias
+      - elix_valvular_disease
+      - elix_pulmonary_circulation
+      - elix_peripheral_vascular
+      - elix_hypertension_uncomplicated
+      - elix_hypertension_complicated
+      - elix_paralysis
+      - elix_neurological_disorders
+      - elix_chronic_pulmonary
+      - elix_diabetes_uncomplicated
+      - elix_diabetes_complicated
+      - elix_hypothyroidism
+      - elix_renal_failure
+      - elix_liver_disease
+      - elix_peptic_ulcer
+      - elix_lymphoma
+      - elix_metastatic_cancer
+      - elix_solid_tumor
+      - elix_rheumatoid_arthritis
+      - elix_coagulopathy
+      - elix_obesity
+      - elix_weight_loss
+      - elix_fluid_electrolyte
+      - elix_blood_loss_anemia
+      - elix_deficiency_anemia
+      - elix_alcohol_abuse
+      - elix_drug_abuse
+      - elix_psychoses
+      - elix_depression
+
+  admission:
+    description: "入院信息"
+    features:
+      - pre_icu_los_hours
+      - admit_type_emergency
+      - admit_type_urgent
+      - admit_type_elective
+      - admit_from_ed
+      - admit_from_transfer
+      - insurance_medicare
+      - insurance_medicaid
+      - insurance_private
+
+  genetic:
+    description: "遗传病标志"
+    features:
+      - has_q_code
+      - has_congenital_heart
+      - has_family_ihd
+
+  sofa_composite:
+    description: "SOFA复合评分"
+    features:
+      - sofa_respiration
+      - sofa_coagulation
+      - sofa_liver
+      - sofa_cardiovascular
+      - sofa_neurological
+      - sofa_renal
+      - sofa_total
