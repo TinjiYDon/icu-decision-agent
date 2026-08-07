@@ -1,0 +1,26 @@
+llm:
+  provider: agnes
+  # 国内镜像端点：apihub.agnes-ai.com 国际端点在国内被 DNS 污染不可达，
+  # apihub.agnes-ai.cn 为中国站镜像（IPv6 可达），OpenAI 兼容接口不变。
+  model: agnes-2.5-flash
+  base_url: https://apihub.agnes-ai.cn/v1
+  temperature: 0.1
+  max_tokens: 2048
+  # 2.5-flash 带 reasoning 模式，完整临床提示词+RAG 上下文响应较慢，放宽到 60s
+  timeout_seconds: 60
+
+rag:
+  embedding_model: moka-ai/m3e-base
+  chunk_size: 512
+  chunk_overlap: 64
+  max_table_chunk: 2048
+  min_chunk_size: 128
+  top_k: 3
+  min_score: 0.3
+  index_path: knowledge_base/faiss_index/medical_knowledge.faiss
+  reference_validation: true
+
+output:
+  include_disclaimers: true
+  max_factor_analysis: 4
+  language: zh-CN

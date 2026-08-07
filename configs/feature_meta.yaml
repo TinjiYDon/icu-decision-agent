@@ -1,0 +1,204 @@
+# 特征元数据表
+# 用途：SHAP+LLM 解释层特征白名单 + 数值解释元数据
+# 版本：v0.2
+# 更新日期：2026-08-06
+
+features:
+  anchor_age:
+    standard_name: "Age（年龄）"
+    unit: "岁"
+    normal_range: [18, 65]
+    critical_low: null
+    critical_high: 80
+    api_allowed: true
+    category: demographic
+    evidence_level: A
+
+  careunit_other:
+    standard_name: "ICU Type（非 SICU/MICU/CCU）"
+    unit: "分类变量"
+    normal_range: null
+    categories: ["micu", "sicu", "ccu", "other"]
+    clinical_note: "不同 ICU 类型风险差异：CCU 心血管事件为主；SICU 术后管理；MICU 脓毒症占比高"
+    api_allowed: true
+    category: demographic
+    evidence_level: B
+
+  vital_temp:
+    standard_name: "Body Temperature（体温）"
+    unit: "°C"
+    normal_range: [36.0, 37.5]
+    critical_low: 35.0
+    critical_high: 41.0
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vital_gcs_total:
+    standard_name: "Glasgow Coma Scale Total（格拉斯哥昏迷评分）"
+    unit: "分"
+    normal_range: [13, 15]
+    critical_low: 8
+    critical_high: null
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vital_fio2:
+    standard_name: "FiO2（吸入氧浓度）"
+    unit: "小数（0.21-1.0）"
+    normal_range: [0.21, 0.40]
+    critical_low: null
+    critical_high: 1.0
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vital_heart_rate:
+    standard_name: "Heart Rate（心率）"
+    unit: "bpm"
+    normal_range: [60, 100]
+    critical_low: 40
+    critical_high: 130
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vital_nbps:
+    standard_name: "NIBP Systolic（无创收缩压）"
+    unit: "mmHg"
+    normal_range: [90, 140]
+    critical_low: 90
+    critical_high: 180
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vital_resp_rate:
+    standard_name: "Respiratory Rate（呼吸频率）"
+    unit: "次/分"
+    normal_range: [12, 20]
+    critical_low: 8
+    critical_high: 30
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  lab_lactate:
+    standard_name: "Lactate（乳酸）"
+    unit: "mmol/L"
+    normal_range: [0.5, 1.7]
+    critical_low: null
+    critical_high: 4.0
+    api_allowed: true
+    category: lab
+    evidence_level: A
+
+  lab_bun:
+    standard_name: "BUN（血尿素氮）"
+    unit: "mg/dL"
+    normal_range: [7, 20]
+    critical_low: null
+    critical_high: 60
+    api_allowed: true
+    category: lab
+    evidence_level: B
+
+  lab_ph:
+    standard_name: "pH（血液酸碱度）"
+    unit: "无单位"
+    normal_range: [7.35, 7.45]
+    critical_low: 7.20
+    critical_high: 7.60
+    api_allowed: true
+    category: lab
+    evidence_level: A
+
+  lab_potassium:
+    standard_name: "Potassium（血钾）"
+    unit: "mmol/L"
+    normal_range: [3.5, 5.0]
+    critical_low: 2.5
+    critical_high: 6.0
+    api_allowed: true
+    category: lab
+    evidence_level: A
+
+  lab_inr:
+    standard_name: "INR（国际标准化比值）"
+    unit: "无单位"
+    normal_range: [0.8, 1.2]
+    critical_low: null
+    critical_high: 3.0
+    api_allowed: true
+    category: lab
+    evidence_level: A
+
+  lab_albumin:
+    standard_name: "Albumin（白蛋白）"
+    unit: "g/dL"
+    normal_range: [3.5, 5.0]
+    critical_low: 2.0
+    critical_high: null
+    api_allowed: true
+    category: lab
+    evidence_level: B
+
+  pre_icu_los_hours:
+    standard_name: "Pre-ICU Length of Stay（入ICU前住院时长）"
+    unit: "小时"
+    normal_range: null
+    clinical_note: "住院时长因病情而异，无固定正常范围"
+    api_allowed: true
+    category: derived
+    evidence_level: C
+
+  gcs_total:
+    standard_name: "GCS Total（GCS总分，汇总值）"
+    unit: "分"
+    normal_range: [13, 15]
+    critical_low: 8
+    critical_high: null
+    api_allowed: true
+    category: vital
+    evidence_level: A
+
+  vasopressor_1h:
+    standard_name: "Vasopressor Use in 1h（1小时内使用血管活性药）"
+    unit: "分类变量（0/1）"
+    normal_range: null
+    categories: [0, 1]
+    clinical_note: "1=使用，0=未使用；使用提示血流动力学不稳定，是休克状态的临床标志，SSC 指南推荐去甲肾上腺素为首选"
+    api_allowed: true
+    category: intervention
+    evidence_level: A
+
+  shock_index:
+    standard_name: "Shock Index（休克指数）"
+    unit: "无量纲（bpm/mmHg）"
+    normal_range: [0.5, 0.7]
+    critical_low: null
+    critical_high: 0.9
+    api_allowed: true
+    category: derived
+    evidence_level: A
+
+  spo2_fio2_ratio:
+    standard_name: "SpO2/FiO2 Ratio（氧合指数）"
+    unit: "无单位（比值）"
+    normal_range: [400, 500]
+    critical_low: 100
+    critical_high: null
+    api_allowed: true
+    category: derived
+    evidence_level: A
+
+# 禁止传入 LLM 的字段（含 PII 或 label 泄露风险）
+denied:
+  - stay_id
+  - hospital_expire_flag
+  - los_hours
+  - dod
+  - outtime
+  - subject_id
+  - hadm_id
