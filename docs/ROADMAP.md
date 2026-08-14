@@ -24,10 +24,10 @@ non_goals: replace TreeSHAP path with GRU-D-only; claim clinical production
 
 | 优先级 | 项 | 说明 |
 |--------|----|------|
-| P0 | 收敛 PR #9 | SHAP+RAG+LLM 合入或拆分；LGBM 讲解链不断 |
-| P0 | `deathtime` 标签 | 替换日期级 `dod`；新 dump 版本号 |
-| P1 | GRU-D 数据前置 | 序列 + mask + Δt；与 LGBM 同 split 对照 |
-| P1 | 滑动窗演进 | `[t−L, t)` + 近端加权 |
+| P0 | ~~收敛 PR #9~~ | **已合入 main（2026-08-14）** |
+| P0 | ~~`deathtime` 代码路径~~ | **已实现**；待 Layer0 重算 label + 新 dump |
+| P1 | GRU-D 真序列训练 | 骨架/smoke 已有；需 chart 序列 dump |
+| P1 | 滑动窗特征 | `temporal.yaml` 已配置 lookback/recency |
 | P2 | Transformer 变体 | 可选消融，非主叙事 |
 
 ## 非目标
