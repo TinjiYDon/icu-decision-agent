@@ -16,7 +16,7 @@ release: decision-s2-console
 ## [Unreleased]
 
 - **Merged** PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9)：SHAP → RAG → LLM 解释页。
-- 标签路径 v2：优先 `admissions.deathtime`（需 Layer0 重跑 label/train/dump）。
+- 标签路径 v2：优先 `admissions.deathtime`；**已在 Layer0 重算 label 并 `train --from-existing`**（test PR-AUC≈0.092）。
 - GRU-D 研究骨架：`domain/models/temporal` + `application.train_grud` smoke。
 
 ## 2026-08

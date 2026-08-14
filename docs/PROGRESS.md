@@ -1,31 +1,19 @@
 # Progress · icu-decision-agent
 
-> 更新：2026-08-14（执行推进）  
-> 人读：本仓做到哪、卡在哪。
-
-## Agent 上下文
-
-```text
-repo: icu-decision-agent
-product: ICU early-warning CDSS at t=intime+h
-primary_metrics: PR-AUC, Brier, operating_point
-baseline_model: LightGBM + TreeSHAP
-explain: SHAP+RAG+LLM merged (PR #9)
-label: prefer admissions.deathtime (v2)
-temporal: GRU-D smoke/skeleton (needs sequence dump to train)
-```
+> 更新：2026-08-14（数据侧继续）
 
 ## 里程碑
 
-| 里程碑 | 状态 | 证据 |
-|--------|------|------|
-| S1 / S2 / 演示台 v4 | 完成 | PR #7/#8 · main |
-| SHAP + RAG + LLM 解释链 | **已合入** | **PR #9 merged** · 监测台「解释」页 |
-| `deathtime` 标签路径 | **代码完成** | `mortality_12h` prefer deathtime；需 Layer0 重跑 label+train |
-| GRU-D 同 split 对照 | **骨架完成** | `domain/models/temporal` · `train_grud` smoke；缺真实序列 dump |
+| 里程碑 | 状态 |
+|--------|------|
+| PR #9 解释链 | ✅ 合入 |
+| deathtime 标签路径 | ✅ 代码 + **已在 Layer0 重算并重训** |
+| S2 指标（v2） | ✅ test PR-AUC≈0.092 · Brier≈0.151 · 阳性 5638/472290 |
+| GRU-D 真序列训练 | 🟡 smoke 有；chart/labs 6h 窗口稀疏，完整 ETL 未完成 |
+| 新 dump 导出 | ⬜ 库内 v2 ≠ 磁盘旧 dump |
 
-## 下一冲刺（剩余）
+## 下一刀
 
-1. 在 Layer0 上 `build_labels` + `application.train`，打新 dump 版本号。  
-2. 从 chart/labs 建真实 (T×F) 序列后训练 PyTorch GRU-D 并对照 LGBM。  
-3. 滑动窗 `[t−L,t)` 接入特征构建（配置已在 `temporal.yaml`）。
+1. `pg_dump` 导出带 v2 label 的新 Layer1 dump 并更新 `DUMP_READY.md`  
+2. 优化 lab/chart 序列抽取（索引/批量）后再训 PyTorch GRU-D  
+3. 校准/工作点针对更低阳性率重定
