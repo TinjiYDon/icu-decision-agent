@@ -15,7 +15,9 @@ release: decision-s2-console
 
 ## [Unreleased]
 
-- **进行中** PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9)（分支 `liujiawei`）：SHAP → RAG → LLM 解释与建议（**未合入 main，不算已交付**）。
+- **Merged** PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9)：SHAP → RAG → LLM 解释页。
+- 标签路径 v2：优先 `admissions.deathtime`（需 Layer0 重跑 label/train/dump）。
+- GRU-D 研究骨架：`domain/models/temporal` + `application.train_grud` smoke。
 
 ## 2026-08
 
