@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import lightgbm as lgb
@@ -166,7 +167,13 @@ def _get_model_bundle() -> tuple[lgb.Booster, object]:
     if _model_bundle is None:
         import shap
 
-        booster = lgb.Booster(model_file=str(model_path))
+        # LightGBM 无法处理含括号/中文的绝对路径，改用相对路径
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(ARTIFACT_DIR)
+            booster = lgb.Booster(model_file="lgbm_mortality_12h.txt")
+        finally:
+            os.chdir(old_cwd)
         explainer = shap.TreeExplainer(booster)
         _model_bundle = (booster, explainer)
     return _model_bundle

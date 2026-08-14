@@ -192,20 +192,26 @@ def fetch_pre_icu_labs() -> dict[int, dict[str, float]]:
 
 
 def fetch_first_icu_vitals(window_hours: int | None = None) -> dict[int, dict[str, float]]:
-    """First vital sign value AFTER intime for each stay → {stay_id: {vital_name: value}}."""
+    """Latest vital sign value up to intime+window_hours for each stay.
+
+    Uses last-observation-carried-forward: for prediction time t=intime+h,
+    we take the most recent chartevents value with charttime <= t.
+    This makes features differ across h (unlike taking the first value).
+    """
     source = get_data_source()
     if source == "mock":
         return {}
+    wh = _wh(window_hours)
     sql = f"""
         WITH ranked AS (
             SELECT
                 c.stay_id,
                 c.itemid,
                 c.valuenum,
-                ROW_NUMBER() OVER (PARTITION BY c.stay_id, c.itemid ORDER BY c.charttime) AS rn
+                ROW_NUMBER() OVER (PARTITION BY c.stay_id, c.itemid ORDER BY c.charttime DESC) AS rn
             FROM mimiciv_icu.chartevents c
             JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
-            WHERE c.charttime >= i.intime AND c.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
+            WHERE c.charttime <= i.intime + INTERVAL '{wh} hours'
               AND c.valuenum IS NOT NULL
               AND c.itemid IN ({_vital_itemid_list()})
         )
@@ -229,22 +235,25 @@ def fetch_first_icu_vitals(window_hours: int | None = None) -> dict[int, dict[st
 
 
 def fetch_first_icu_labs(window_hours: int | None = None) -> dict[int, dict[str, float]]:
-    """First lab value AFTER intime (within 1h) per stay → {stay_id: {lab_name: value}}.
+    """Latest lab value up to intime+window_hours per stay.
+
+    Uses last-observation-carried-forward so features differ across h.
     Used as fallback when pre-ICU labs are not available.
     """
     source = get_data_source()
     if source == "mock":
         return {}
+    wh = _wh(window_hours)
     sql = f"""
         WITH ranked AS (
             SELECT
                 i.stay_id,
                 l.itemid,
                 l.valuenum,
-                ROW_NUMBER() OVER (PARTITION BY i.stay_id, l.itemid ORDER BY l.charttime) AS rn
+                ROW_NUMBER() OVER (PARTITION BY i.stay_id, l.itemid ORDER BY l.charttime DESC) AS rn
             FROM mimiciv_icu.icustays i
             JOIN mimiciv_hosp.labevents l ON i.hadm_id = l.hadm_id
-            WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '{_wh(window_hours)} hours'
+            WHERE l.charttime <= i.intime + INTERVAL '{wh} hours'
               AND l.valuenum IS NOT NULL
               AND l.itemid IN ({_itemid_list()})
         )
