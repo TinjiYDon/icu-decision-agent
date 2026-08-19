@@ -182,6 +182,10 @@ def predict_grud(stay_id: int) -> dict:
                 FEATURE_NAMES[i]: round(float(seq["x"][:, i].mean()), 4)
                 for i in range(len(FEATURE_NAMES))
             },
+            "per_timestep_values": seq["x"].tolist(),
+            "per_timestep_attribution": attr["per_timestep"].tolist(),
+            "feature_names": FEATURE_NAMES,
+            "time_labels": [f"t={i}" for i in range(seq["x"].shape[0])],
         },
         "features": {FEATURE_NAMES[i]: round(float(seq["x"][-1, i]), 4) if not np.isnan(seq["x"][-1, i]) else None
                      for i in range(len(FEATURE_NAMES))},
