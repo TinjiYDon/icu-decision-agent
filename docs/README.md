@@ -6,7 +6,10 @@
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
-| [STATUS.md](STATUS.md) | 当前进度 |
+| [STATUS.md](STATUS.md) | 当前进度与指标 |
+| [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
+| [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
+| [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
 | [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore**（含特征口径） |
 | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | **答辩演示口播** |
 | [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 / 常见问题 |

@@ -1,0 +1,24 @@
+# Temporal / GRU-D settings (research track; LightGBM remains deployable baseline)
+temporal:
+  model: grud
+  # Sliding lookback ending at prediction time t (hours). 0 = expanding window [intime, t).
+  lookback_hours: 6
+  # Recency weight: w(delta_h) = exp(-lambda * delta_h); 0 disables.
+  recency_lambda: 0.15
+  max_timesteps: 24
+  feature_keys:
+    - hr
+    - sbp
+    - dbp
+    - spo2
+    - resp_rate
+    - temperature
+    - lactate
+    - creatinine
+  hidden_size: 64
+  dropout: 0.1
+  epochs: 20
+  batch_size: 64
+  lr: 0.001
+  # Same stay-level split as LightGBM
+  split_seed: 42

@@ -24,8 +24,13 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发** |
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly 监测台 |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
-| [docs/STATUS.md](docs/STATUS.md) | 当前进度 |
+| [docs/STATUS.md](docs/STATUS.md) | 当前进度与指标 |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 本仓变更 / Release |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 下一版本 |
 | [docs/README.md](docs/README.md) | 文档索引 |
+
+**进行中**：PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9) SHAP+RAG+LLM（未计入已交付）。
 
 ## 答辩演示
 

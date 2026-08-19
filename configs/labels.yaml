@@ -4,7 +4,9 @@ primary:
   horizon_hours: 12
   # Window starts at prediction time t=intime+features.prediction_offset_hours (S1)
   event: death_from_prediction_time
-  note: "S1 label in [t, t+12h]; not from intime alone"
+  note: "S1/S2 label in [t, t+12h]; prefer admissions.deathtime over date-level dod"
+  death_time_prefer: deathtime   # deathtime | dod
+  label_version: mortality_12h_v2_deathtime
 
 horizons_hours: [4, 8, 12, 24]
 
