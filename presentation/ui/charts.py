@@ -171,3 +171,136 @@ def fig_net_benefit(curve: dict[str, Any]) -> go.Figure:
         legend=dict(orientation="h", y=1.12),
     )
     return fig
+
+
+def fig_dual_encoded_heatmap(
+    values: list[list[float]],
+    attributions: list[list[float]],
+    feature_names: list[str],
+    time_labels: list[str],
+) -> go.Figure:
+    """Dual-encoded heatmap: time×feature grid.
+
+    X-axis: time steps (30-min intervals)
+    Y-axis: physiological features
+    Color: Per-feature normalized signed attribution — red=increases risk, blue=decreases risk
+    Cell text: actual feature value at that timestep (or "—" if missing)
+    """
+    import numpy as np
+
+    T = len(time_labels)
+    F = len(feature_names)
+    attr_arr = np.array(attributions) if (attributions is not None and len(attributions) > 0) else np.zeros((T, F))
+    val_arr = np.array(values) if (values is not None and len(values) > 0) else np.zeros((T, F))
+
+    # Drop padded (negative-time) columns — they carry no observations by
+    # construction (pad_truncate zero-fills the head), so hiding them makes
+    # the chart denser without losing any information.
+    keep = [i for i, lbl in enumerate(time_labels) if not str(lbl).startswith("pad")]
+    if keep and len(keep) < T:
+        time_labels = [time_labels[i] for i in keep]
+        val_arr = val_arr[keep, :]
+        attr_arr = attr_arr[keep, :]
+        T = len(keep)
+
+    # Amplify tiny gradients caused by RNN vanishing-gradient over long sequences.
+    # This is a visualization-only scaling; it does NOT change the underlying model.
+    ATTR_AMPLIFY = 100000.0
+    attr_arr = attr_arr * ATTR_AMPLIFY
+
+    # Normalize each feature independently to [-1, 1] so colors are vivid
+    normalized = np.zeros_like(attr_arr, dtype=float)
+    for f_idx in range(F):
+        col = attr_arr[:, f_idx]
+        col_abs_max = np.max(np.abs(col))
+        if col_abs_max > 1e-12:
+            normalized[:, f_idx] = col / col_abs_max
+
+    # Build text grid: show actual value or "—" for missing
+    text_vals = []
+    for t in range(T):
+        row = []
+        for f in range(F):
+            v = val_arr[t, f]
+            # Handle both numeric and string values
+            if isinstance(v, str):
+                row.append(v)
+            elif np.isnan(v) or abs(float(v)) < 1e-6:
+                row.append("—")
+            else:
+                row.append(f"{float(v):.1f}")
+        text_vals.append(row)
+
+    # Plotly Heatmap expects z shaped (len(y), len(x)) = (F features, T timesteps).
+    # Our matrices are (T, F), so transpose both z and text.
+    z_display = normalized.T.tolist()
+    text_display = [list(col) for col in zip(*text_vals)]  # transpose (T,F) -> (F,T)
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=z_display,
+            x=time_labels,
+            y=feature_names,
+            colorscale=[
+                [0.0,  "#1565c0"],   # deep blue — max protective
+                [0.25, "#64b5f6"],   # light blue
+                [0.5,  "#ffffff"],   # white — neutral
+                [0.75, "#ff8a65"],   # light red
+                [1.0,  "#c62828"],   # deep red — max risk
+            ],
+            zmin=-1.0,
+            zmax=1.0,
+            text=text_display,
+            texttemplate="%{text}",
+            textfont=dict(size=10, color="#1e293b"),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "时间: %{x}<br>"
+                "归因值: %{z:.3f}<br>"
+                "实际值: %{text}<extra></extra>"
+            ),
+            showscale=True,
+            colorbar=dict(
+                title=dict(
+                    text="归因强度<br>(红↑风险 蓝↓保护)",
+                    side="right",
+                    font=dict(size=11),
+                ),
+                tickfont=dict(size=9),
+                len=0.55,
+                thickness=14,
+                tickvals=[-1.0, 0.0, 1.0],
+                ticktext=["保护", "中性", "风险"],
+            ),
+        )
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="双编码时序归因热力图（Xian et al., IJMI 2026）<br>"
+                  "<sub>颜色=逐特征归一化归因 | 数值=生理变量实际值 | 时间轴=入科后30分钟间隔</sub>",
+            font=dict(size=14),
+        ),
+        xaxis_title="时间（入科后，30min/步）",
+        yaxis_title="生理特征",
+        xaxis=dict(tickangle=0, tickfont=dict(size=8), side="top"),
+        yaxis=dict(tickfont=dict(size=10), autorange="reversed"),
+        margin=dict(l=90, r=110, t=90, b=40),
+        height=max(400, F * 40 + 120),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.95)",
+        font=dict(color=SLATE),
+        annotations=[
+            go.layout.Annotation(
+                x=1.02, y=1.06, xref="paper", yref="paper",
+                text="▶ 红色 = 推高风险", showarrow=False,
+                font=dict(size=11, color="#c62828"),
+            ),
+            go.layout.Annotation(
+                x=1.02, y=0.90, xref="paper", yref="paper",
+                text="▶ 蓝色 = 保护因素", showarrow=False,
+                font=dict(size=11, color="#1565c0"),
+            ),
+        ],
+    )
+    return fig
