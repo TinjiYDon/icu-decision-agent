@@ -52,18 +52,27 @@ def _load_model() -> tuple[GRUD, torch.device]:
 
 
 def _fetch_raw_sequence(stay_id: int) -> dict | None:
-    """Fetch time-series for a single stay from MIMIC layer0 DB."""
+    """Fetch time-series for a single stay, constructing the input EXACTLY
+    like training (train_grud.fetch_grud_sequences → _build_sequence_from_raw):
+    carry-forward fill (+0.25h tolerance), temperature °F→°C, value clipping.
+    Any train/inference mismatch here shifts the model output distribution."""
     dsn = get_layer0_dsn()
-    if not dsn: return None
+    if not dsn:
+        return None
     engine = create_engine(dsn, pool_pre_ping=True)
-    itemid_map = {
-        "hr": 220045, "sbp": 220179, "lactate": 50813, "creatinine": 50912,
-        "resp_rate": 220210, "temperature": 223761, "spo2": 220277, "bun": 51006,
-    }
 
-    # Fetch all observations in [intime, intime+lookback)
-    sql = f"""
-        SELECT c.stay_id, c.itemid, c.valuenum,
+    from domain.models.temporal.train_grud import (
+        _build_sequence_from_raw,
+        _clip_value,
+        _itemids_for_features,
+    )
+
+    itemid_map = _itemids_for_features()
+    vital_iids = [itemid_map[k] for k in ("hr", "sbp", "resp_rate", "temperature", "spo2")]
+    lab_iids = [itemid_map[k] for k in ("lactate", "creatinine", "bun")]
+
+    sql_vital = f"""
+        SELECT c.itemid, c.valuenum,
                EXTRACT(EPOCH FROM (c.charttime - i.intime)) / 3600.0 AS hrs
         FROM mimiciv_icu.chartevents c
         JOIN mimiciv_icu.icustays i ON c.stay_id = i.stay_id
@@ -71,9 +80,10 @@ def _fetch_raw_sequence(stay_id: int) -> dict | None:
           AND c.charttime >= i.intime
           AND c.charttime < i.intime + INTERVAL '{LOOKBACK_HOURS} hours'
           AND c.valuenum IS NOT NULL
-          AND c.itemid IN ({",".join(str(v) for v in itemid_map.values())})
-        UNION ALL
-        SELECT i.stay_id, l.itemid, l.valuenum,
+          AND c.itemid IN ({",".join(str(v) for v in vital_iids)})
+    """
+    sql_lab = f"""
+        SELECT l.itemid, l.valuenum,
                EXTRACT(EPOCH FROM (l.charttime - i.intime)) / 3600.0 AS hrs
         FROM mimiciv_icu.icustays i
         JOIN mimiciv_hosp.labevents l ON i.hadm_id = l.hadm_id
@@ -81,39 +91,26 @@ def _fetch_raw_sequence(stay_id: int) -> dict | None:
           AND l.charttime >= i.intime
           AND l.charttime < i.intime + INTERVAL '{LOOKBACK_HOURS} hours'
           AND l.valuenum IS NOT NULL
-          AND l.itemid IN ({",".join(str(v) for v in itemid_map.values())})
-        ORDER BY hrs
+          AND l.itemid IN ({",".join(str(v) for v in lab_iids)})
     """
+    charts: dict[int, list[tuple[float, float]]] = {}
+    labs: dict[int, list[tuple[float, float]]] = {}
     with engine.connect() as conn:
-        rows = conn.execute(text(sql), {"sid": stay_id}).mappings().all()
+        for r in conn.execute(text(sql_vital), {"sid": stay_id}).mappings().all():
+            iid, val, hrs = int(r["itemid"]), float(r["valuenum"]), float(r["hrs"])
+            if iid == 223761:
+                val = (val - 32) * 5 / 9  # °F → °C, same as training
+            val = _clip_value(iid, val)
+            charts.setdefault(iid, []).append((hrs, val))
+        for r in conn.execute(text(sql_lab), {"sid": stay_id}).mappings().all():
+            iid, val, hrs = int(r["itemid"]), float(r["valuenum"]), float(r["hrs"])
+            labs.setdefault(iid, []).append((hrs, val))
 
-    if not rows:
+    seq = _build_sequence_from_raw(charts, labs, itemid_map)
+    if seq is None:
         return None
 
-    # Build (T, F) matrix
-    n_steps = int(LOOKBACK_HOURS * 2)  # 30-min grid
-    uniform_x = np.full((n_steps, len(FEATURE_NAMES)), np.nan, dtype=np.float64)
-    uniform_times = np.arange(n_steps) * 0.5
-
-    # Group by feature
-    feat_idx = {name: i for i, name in enumerate(FEATURE_NAMES)}
-    for r in rows:
-        itemid = int(r["itemid"])
-        val = float(r["valuenum"])
-        hrs = float(r["hrs"])
-        # Find feature index
-        for name, iid in itemid_map.items():
-            if iid == itemid:
-                fi = feat_idx.get(name)
-                if fi is not None:
-                    step = min(int(hrs * 2), n_steps - 1)
-                    uniform_x[step, fi] = val
-                break
-
-    # Forward-fill missing, build mask + delta
-    x_ff, m, delta = build_mask_delta(uniform_x, uniform_times)
-    x_p, m_p, d_p = pad_truncate(x_ff, m, delta, MAX_TIMESTEPS)
-
+    x_p, m_p, d_p = pad_truncate(seq["x"], seq["m"], seq["delta"], MAX_TIMESTEPS)
     return {"x": x_p, "m": m_p, "delta": d_p}
 
 
@@ -160,10 +157,23 @@ def predict_grud(stay_id: int) -> dict:
     # Attribution
     attr = gradient_input_attribution(model, seq["x"], seq["m"], seq["delta"])
 
-    # Build top_factors in same format as LightGBM
+    # Build top_factors in same format as LightGBM.
+    # Raw Gradient×Input values are ~1e-5; round to 4 decimals would zero them out.
+    # Use relative importance normalized to max=1 so bars remain readable.
+    raw_vals = [f["value"] for f in attr["top_features"]]
+    max_val = max(raw_vals) if raw_vals else 0.0
     top_factors = [
-        {"feature": f["feature"], "value": f["value"], "shap": f["value"]}
+        {"feature": f["feature"], "value": f["value"], "shap": (f["value"] / max_val if max_val > 0 else 0.0)}
         for f in attr["top_features"]
+    ]
+
+    # Time labels: pad_truncate prepends (max_t - n_steps) zero rows, so real
+    # observations (hours 0..lookback) live at the END of the sequence. Label
+    # padded columns as "pad" and real columns with actual hour offsets.
+    n_total = seq["x"].shape[0]
+    pad_len = max(n_total - int(LOOKBACK_HOURS * 2), 0)
+    time_labels = [f"pad({i - pad_len}h)" for i in range(pad_len)] + [
+        f"{(i - pad_len) * 0.5:.1f}h" for i in range(pad_len, n_total)
     ]
 
     recommend = recommend_action(prob, score_kind="probability")
@@ -183,9 +193,10 @@ def predict_grud(stay_id: int) -> dict:
                 for i in range(len(FEATURE_NAMES))
             },
             "per_timestep_values": seq["x"].tolist(),
-            "per_timestep_attribution": attr["per_timestep"].tolist(),
+            "per_timestep_attribution": attr["per_timestep_signed"].tolist(),
+            "per_timestep_magnitude": attr["per_timestep"].tolist(),
             "feature_names": FEATURE_NAMES,
-            "time_labels": [f"t={i}" for i in range(seq["x"].shape[0])],
+            "time_labels": time_labels,
         },
         "features": {FEATURE_NAMES[i]: round(float(seq["x"][-1, i]), 4) if not np.isnan(seq["x"][-1, i]) else None
                      for i in range(len(FEATURE_NAMES))},

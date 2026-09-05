@@ -12,6 +12,8 @@ import numpy as np
 import torch
 
 
+# Column order MUST match train_grud._itemids_for_features() — the actual
+# training-time feature order (yaml feature_keys is informational only).
 FEATURE_NAMES = ["hr", "sbp", "lactate", "creatinine", "resp_rate", "temperature", "spo2", "bun"]
 
 
@@ -43,7 +45,10 @@ def gradient_input_attribution(
     pred.backward()
 
     grad = X.grad  # (1, T, F)
-    attr = torch.abs(grad * X).squeeze(0).detach().numpy()  # (T, F)
+    # Raw signed attribution: grad * x (sign indicates direction)
+    raw_attr = (grad * X).squeeze(0).detach().numpy()  # (T, F), signed
+    # Magnitude for top_features (always positive)
+    attr = np.abs(raw_attr)
 
     # Per-feature importance = mean across timesteps
     feat_imp = {
@@ -56,12 +61,13 @@ def gradient_input_attribution(
     feat_means = {FEATURE_NAMES[i]: float(attr[:, i].mean()) for i in range(attr.shape[1])}
     top = sorted(feat_means.items(), key=lambda kv: kv[1], reverse=True)
     top_factors = [
-        {"feature": name, "value": round(val, 4)}
+        {"feature": name, "value": float(val)}  # keep raw magnitude (~1e-5); rounding here would zero it
         for name, val in top
     ]
 
     return {
         "feature_importance": feat_imp,
         "per_timestep": attr,
+        "per_timestep_signed": raw_attr,
         "top_features": top_factors,
     }
