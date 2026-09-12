@@ -23,8 +23,28 @@ def list_stays(limit: int = 200) -> tuple[dict[str, Any], ...]:
     return tuple(rows[:limit])
 
 
-def predict_patient(stay_id: int, hour_index: int | None = None) -> dict[str, Any]:
-    """L4 contract: stay_id (+ optional hour_index) -> risk_score, top_factors, status."""
+def predict_patient(
+    stay_id: int,
+    hour_index: int | None = None,
+    model_type: str = "lgbm",
+) -> dict[str, Any]:
+    """L4 contract: stay_id (+ optional hour_index + model_type) -> risk_score, top_factors, status.
+    
+    Args:
+        stay_id: ICU stay identifier
+        hour_index: Prediction hour after ICU admission (None = config default)
+        model_type: "lgbm" (default) or "grud" for temporal model
+    """
+    if model_type == "grud":
+        # GRU-D uses fixed lookback window, hour_index is for output metadata only
+        from application.predict_grud import predict_grud
+        result = predict_grud(int(stay_id))
+        # Override hour_index in result if explicitly provided
+        if hour_index is not None:
+            result["hour_index"] = int(hour_index)
+        return result
+    
+    # Default: LightGBM static model
     h = prediction_hour_index() if hour_index is None else int(hour_index)
     return predict_stay(int(stay_id), hour_index=h)
 
@@ -37,11 +57,17 @@ def predict_patient_trajectory(stay_id: int) -> dict[str, Any]:
 def predict_patient_with_explanation(
     stay_id: int,
     hour_index: int | None = None,
+    model_type: str = "lgbm",
 ) -> dict[str, Any]:
     """L4 扩展接口：风险预测 + SHAP+LLM 可解释性报告。
 
     严格遵循分层契约（ADR-001）：L4 编排 L3 预测与 L3.5 解释，
     L3（lgbm.predict_stay）保持不变，L3.5 不反向调用 L3。
+
+    Args:
+        stay_id: ICU stay identifier
+        hour_index: Prediction hour after ICU admission
+        model_type: "lgbm" or "grud"
 
     Returns:
         在 predict_patient 输出基础上增加 "explanation" 字段：
@@ -60,7 +86,7 @@ def predict_patient_with_explanation(
     # 延迟导入，避免 L4 在未配置 LLM 时整体不可用
     from domain.explain.shap_llm import generate_explanation
 
-    prediction = predict_patient(int(stay_id), hour_index=hour_index)
+    prediction = predict_patient(int(stay_id), hour_index=hour_index, model_type=model_type)
     if prediction.get("status") != "ok":
         return prediction
 

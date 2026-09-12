@@ -13,23 +13,39 @@ from application.predict_patient import predict_patient, predict_patient_traject
 from domain.features.build import prediction_hours
 from infra.config import load_yaml
 from infra.db import get_engine
-from presentation.ui.charts import fig_risk_trajectory, fig_shap_bars
+from presentation.ui.charts import fig_risk_trajectory, fig_shap_bars, fig_dual_encoded_heatmap
 from presentation.ui.theme import disclaimer, risk_badge_html, status_message
+from domain.models.temporal.attribution import FEATURE_NAMES
 
-# S2 dump 以化验+年龄为主；chart 生命体征在导出中常为 null，故面板以可得信号优先。
+# 统一特征面板：LightGBM 和 GRU-D 均展示同一套 MIMIC-IV 生理特征
+# 这些键来自 predict_grud() 返回的 features，对两种模型都可用
 DISPLAY_FIELDS = {
+    "hr": "心率",
+    "sbp": "收缩压",
+    "lactate": "乳酸",
+    "creatinine": "肌酐",
+    "resp_rate": "呼吸频率",
+    "temperature": "体温",
+    "spo2": "SpO2",
+    "bun": "BUN",
     "anchor_age": "年龄",
     "lab_bun": "BUN",
     "lab_creatinine": "肌酐",
-    "lab_hematocrit": "Hct",
-    "lab_sodium": "钠",
-    "lab_potassium": "钾",
     "lab_lactate": "乳酸",
-    "lab_glucose": "血糖",
-    "lab_inr": "INR",
-    "lab_ph": "pH",
     "vital_heart_rate": "心率",
     "vital_nbps": "血压",
+}
+
+# GRU-D 专属特征（预测时从 MIMIC-IV 实时拉取）
+GRUD_DISPLAY_FIELDS = {
+    "hr": "心率",
+    "sbp": "收缩压",
+    "lactate": "乳酸",
+    "creatinine": "肌酐",
+    "resp_rate": "呼吸频率",
+    "temperature": "体温",
+    "spo2": "SpO2",
+    "bun": "BUN",
 }
 
 
@@ -97,8 +113,8 @@ def _hours_for_stay(stay_id: int) -> tuple[int, ...]:
 
 
 @st.cache_data(show_spinner=False, ttl=120)
-def _cached_predict(stay_id: int, hour_index: int) -> dict[str, Any]:
-    return predict_patient(int(stay_id), hour_index=int(hour_index))
+def _cached_predict(stay_id: int, hour_index: int, model_type: str = "lgbm") -> dict[str, Any]:
+    return predict_patient(int(stay_id), hour_index=int(hour_index), model_type=model_type)
 
 
 @st.cache_data(show_spinner=False, ttl=120)
@@ -148,7 +164,7 @@ def _apply_forced_stay(options: dict[str, int]) -> None:
 
 def render_monitor() -> None:
     st.title("ICU 早期恶化预警 · 监测台")
-    st.caption("S2 多时刻 · LightGBM + SHAP · 切换住院后按 stay/h 重新预测")
+    st.caption("S2 多时刻 · LightGBM + SHAP / GRU-D 时序 · 切换住院后按 stay/h 重新预测")
 
     import os
 
@@ -164,6 +180,17 @@ def render_monitor() -> None:
     mc2.metric("PR-AUC（测试）", f"{float(metrics.get('pr_auc_test') or 0):.3f}" if metrics else "—")
     mc3.metric("Brier（测试）", f"{float(metrics.get('brier_test') or 0):.3f}" if metrics else "—")
     mc4.metric("工作点", f"{float(metrics.get('operating_threshold') or 0):.3f}" if metrics else "—")
+
+    # Model selector
+    from pathlib import Path as _Path
+    _project_root = _Path(__file__).resolve().parents[2]
+    has_gru = (_project_root / "artifacts" / "models" / "grud_mortality.pt").exists()
+    model_opts = ["LightGBM（静态特征+SHAP，推荐）"]
+    if has_gru:
+        model_opts.append("GRU-D（时序+梯度归因）")
+    model_type = st.sidebar.selectbox("预测模型", model_opts, key="mon_model")
+    model_type_key = "grud" if model_type.startswith("GRU") else "lgbm"
+    st.sidebar.caption(f"GRU-D 模型 {'可用 ✓' if has_gru else '未训练（运行 --train-gru）'}")
 
     stays = list(_rich_stays(2500))
     if not stays:
@@ -220,7 +247,7 @@ def render_monitor() -> None:
                 else:
                     st.warning("未找到可用低风险样例")
 
-    result = _cached_predict(stay_id, hour)
+    result = _cached_predict(stay_id, hour, model_type_key)
     traj = _cached_traj(stay_id)
 
     if result.get("status") != "ok":
@@ -232,7 +259,7 @@ def render_monitor() -> None:
     if int(result.get("stay_id") or 0) != stay_id or int(result.get("hour_index") or -1) != hour:
         st.warning("预测结果与当前选择不一致，正在重算…")
         _cached_predict.clear()
-        result = predict_patient(stay_id, hour_index=hour)
+        result = predict_patient(stay_id, hour_index=hour, model_type=model_type_key)
 
     score = float(result["risk_score"])
     kind = result.get("score_kind", "raw")
@@ -240,6 +267,12 @@ def render_monitor() -> None:
     band = str(rec.get("band", "unknown"))
     band_label = str(rec.get("label", band))
     thr = dict((load_yaml("labels.yaml").get("recommend") or {}))
+
+    # GRU-D mode: show gradient attribution
+    is_grud = model_type_key == "grud"
+    gru_attr = result.get("gru_attribution") or {}
+    gru_top = result.get("top_factors") or []
+    gru_features = result.get("features") or {}
     quality = result.get("feature_quality") or {}
     feats = result.get("features") or {}
 
@@ -276,13 +309,14 @@ def render_monitor() -> None:
             f"复查 < {thr.get('recheck', 0.4)} · "
             f"加强监护 < {thr.get('monitor', 0.7)} · 以上升级处置"
         )
-        shown = list(DISPLAY_FIELDS.items())
+        shown = list(GRUD_DISPLAY_FIELDS.items() if is_grud else DISPLAY_FIELDS.items())
         missing = sum(1 for k, _ in shown if _fmt_val(feats.get(k)) == "—")
-        st.caption(f"面板缺测 {missing}/{len(shown)}（— = JSON 中无值；非把 0 当实测）")
+        panel_label = "GRU-D 时序特征" if is_grud else "静态特征面板"
+        st.caption(f"[{panel_label}] 缺测 {missing}/{len(shown)}（— = 该时刻无实测值）")
         cols = st.columns(4)
-        for i, (k, label) in enumerate(shown):
+        for i, (k, feat_label) in enumerate(shown):
             with cols[i % 4]:
-                st.metric(label, _fmt_val(feats.get(k)))
+                st.metric(feat_label, _fmt_val(feats.get(k)))
 
     with right:
         pts = [
@@ -299,23 +333,50 @@ def render_monitor() -> None:
         else:
             st.info("该住院暂无多时刻轨迹")
 
-    st.subheader("可解释性（SHAP）")
-    factors = result.get("top_factors") or []
-    if quality.get("usable") and factors:
-        c_a, c_b = st.columns([1.2, 1])
-        with c_a:
-            st.plotly_chart(
-                fig_shap_bars(factors),
-                use_container_width=True,
-                key=f"shap_{stay_id}_{hour}",
-            )
-        with c_b:
-            st.dataframe(pd.DataFrame(factors), use_container_width=True, hide_index=True)
-            with st.expander("完整特征向量（缺测为 null）"):
-                st.json(feats)
-    elif not quality.get("usable"):
-        st.warning("特征不足，已隐藏 SHAP，避免用填充零值误导解释。")
-    else:
-        st.caption("无 SHAP 因子")
+    st.subheader("可解释性" + ("（梯度归因 + 双编码热力图）" if is_grud else "（SHAP）"))
+    factors = gru_top if is_grud else (result.get("top_factors") or [])
+    gru_attr = result.get("gru_attribution") or {}
+    if factors:
+        if is_grud and gru_attr:
+            # Dual-encoded heatmap (Xian et al., IJMI 2026)
+            vals = gru_attr.get("per_timestep_values") or []
+            attrs = gru_attr.get("per_timestep_attribution") or []
+            feat_names = gru_attr.get("feature_names") or FEATURE_NAMES
+            time_labels = gru_attr.get("time_labels") or [f"t={i}" for i in range(len(vals))] if vals else []
+            if vals and attrs:
+                c_a, c_b = st.columns([1.8, 1])
+                with c_a:
+                    st.plotly_chart(
+                        fig_dual_encoded_heatmap(vals, attrs, feat_names, time_labels),
+                        use_container_width=True,
+                        key=f"heatmap_{stay_id}_{hour}",
+                    )
+                with c_b:
+                    st.plotly_chart(
+                        fig_shap_bars(factors),
+                        use_container_width=True,
+                        key=f"shap_{stay_id}_{hour}_gru",
+                    )
+            else:
+                st.plotly_chart(fig_shap_bars(factors), use_container_width=True, key=f"shap_{stay_id}_{hour}_gru")
+        else:
+            c_a, c_b = st.columns([1.2, 1])
+            with c_a:
+                st.plotly_chart(
+                    fig_shap_bars(factors),
+                    use_container_width=True,
+                    key=f"shap_{stay_id}_{hour}_{'gru' if is_grud else 'lgbm'}",
+                )
+            with c_b:
+                st.dataframe(pd.DataFrame(factors), use_container_width=True, hide_index=True)
+                if not is_grud:
+                    with st.expander("完整特征向量（缺测为 null）"):
+                        st.json(feats)
+    elif not is_grud:
+        quality = result.get("feature_quality") or {}
+        if not quality.get("usable"):
+            st.warning("特征不足，已隐藏 SHAP，避免用填充零值误导解释。")
+        else:
+            st.caption("无 SHAP 因子")
 
     disclaimer()

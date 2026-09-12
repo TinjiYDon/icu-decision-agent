@@ -214,8 +214,8 @@ def _kb_chunk_count() -> int:
 
 
 @st.cache_data(show_spinner=False, ttl=60)
-def _cached_explain(stay_id: int, hour_index: int) -> dict[str, Any]:
-    return predict_patient_with_explanation(stay_id, hour_index)
+def _cached_explain(stay_id: int, hour_index: int, model_type: str = "auto") -> dict[str, Any]:
+    return predict_patient_with_explanation(stay_id, hour_index, model_type=model_type)
 
 
 def render_explain() -> None:
@@ -251,6 +251,14 @@ def render_explain() -> None:
         hour = st.selectbox("预测时刻（入科后小时）", hours, key="exp_hour")
 
         st.divider()
+        from pathlib import Path as _P
+        _model_opts = ["LightGBM（静态特征+SHAP）"]
+        if (_P("artifacts/models/grud_mortality.pt")).exists():
+            _model_opts.append("GRU-D（时序+梯度归因）")
+        _model_sel = st.selectbox("模型", _model_opts, key="exp_model")
+        _model_type_key = "grud" if "GRU" in _model_sel else "lgbm"
+
+        st.divider()
         st.markdown("### 系统状态")
         cfg = get_config()
         st.caption(f"LLM：`{cfg.llm.model}`")
@@ -261,7 +269,7 @@ def render_explain() -> None:
 
     # ── 主内容区 ───────────────────────────────────────────────
     with st.spinner("正在调用 LLM 生成临床解释…"):
-        result = _cached_explain(stay_id, hour)
+        result = _cached_explain(stay_id, hour, model_type=_model_type_key)
 
     if result.get("status") != "ok":
         st.error(f"预测失败：{result.get('status')} — {result.get('message', '')}")
