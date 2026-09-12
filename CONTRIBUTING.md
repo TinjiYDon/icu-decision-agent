@@ -37,4 +37,4 @@ pytest tests/test_smoke.py tests/test_db.py tests/test_etl.py -q
 
 `data` · `algo` · `app` · `ui` · `infra` · `bug` · `blocked`
 
-任务 backlog：[`docs/BACKLOG.md`](docs/BACKLOG.md)
+任务 backlog：[`docs/STATUS.md`](docs/STATUS.md) · [`docs/PROGRESS.md`](docs/PROGRESS.md)

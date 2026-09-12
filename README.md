@@ -2,7 +2,7 @@
 
 独立开源项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
 
-**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
+**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/STATUS.md`](docs/STATUS.md)
 
 ## 快速开始
 
