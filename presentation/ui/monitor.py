@@ -6,16 +6,15 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
-from sqlalchemy import text
 
 from application.acceptance import load_metrics_artifact
 from application.predict_patient import predict_patient, predict_patient_trajectory
+from application.ui_queries import list_demo_stays, list_hours_for_stay
 from domain.features.build import prediction_hours
-from infra.config import load_yaml
-from infra.db import get_engine
+from domain.models.temporal.attribution import FEATURE_NAMES
+from infra.config import get_settings, load_yaml
 from presentation.ui.charts import fig_risk_trajectory, fig_shap_bars, fig_dual_encoded_heatmap
 from presentation.ui.theme import disclaimer, risk_badge_html, status_message
-from domain.models.temporal.attribution import FEATURE_NAMES
 
 # 统一特征面板：LightGBM 和 GRU-D 均展示同一套 MIMIC-IV 生理特征
 # 这些键来自 predict_grud() 返回的 features，对两种模型都可用
@@ -64,52 +63,15 @@ def _fmt_val(v: Any) -> str:
 
 
 @st.cache_data(show_spinner=False, ttl=120)
-def _rich_stays(limit: int = 2500) -> tuple[dict[str, Any], ...]:
-    """Stays with age + ≥2 labs at any hour (usable for demo)."""
-    engine = get_engine()
-    sql = """
-        SELECT f.stay_id,
-               MAX(COALESCE(s.los_hours, 0)) AS los_hours,
-               MIN(f.hour_index) AS first_hour
-        FROM feat.sample_matrix f
-        LEFT JOIN staging.icustays s ON s.stay_id = f.stay_id
-        WHERE f.hour_index = 1
-          AND COALESCE((f.feature_json->>'anchor_age')::float, 0) > 0
-          AND (
-            (CASE WHEN COALESCE((f.feature_json->>'lab_creatinine')::float, 0) <> 0 THEN 1 ELSE 0 END)
-          + (CASE WHEN COALESCE((f.feature_json->>'lab_hematocrit')::float, 0) <> 0 THEN 1 ELSE 0 END)
-          + (CASE WHEN COALESCE((f.feature_json->>'lab_bun')::float, 0) <> 0 THEN 1 ELSE 0 END)
-          + (CASE WHEN COALESCE((f.feature_json->>'lab_lactate')::float, 0) <> 0 THEN 1 ELSE 0 END)
-          + (CASE WHEN COALESCE((f.feature_json->>'lab_sodium')::float, 0) <> 0 THEN 1 ELSE 0 END)
-          ) >= 2
-        GROUP BY f.stay_id
-        ORDER BY f.stay_id
-        LIMIT :lim
-    """
-    with engine.connect() as conn:
-        rows = conn.execute(text(sql), {"lim": int(limit)}).mappings().all()
-    return tuple(
-        {
-            "stay_id": int(r["stay_id"]),
-            "los_hours": float(r["los_hours"] or 0),
-            "first_hour": int(r["first_hour"] or 0),
-        }
-        for r in rows
-    )
+def _rich_stays_cached(limit: int = 2500) -> tuple[dict[str, Any], ...]:
+    """Streamlit-cached wrapper for L4 list_demo_stays."""
+    return tuple(list_demo_stays(limit))
 
 
 @st.cache_data(show_spinner=False, ttl=120)
-def _hours_for_stay(stay_id: int) -> tuple[int, ...]:
-    engine = get_engine()
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                "SELECT hour_index FROM feat.sample_matrix "
-                "WHERE stay_id = :sid ORDER BY hour_index"
-            ),
-            {"sid": int(stay_id)},
-        ).fetchall()
-    return tuple(int(r[0]) for r in rows)
+def _hours_for_stay_cached(stay_id: int) -> tuple[int, ...]:
+    """Streamlit-cached wrapper for L4 list_hours_for_stay."""
+    return tuple(list_hours_for_stay(int(stay_id)))
 
 
 @st.cache_data(show_spinner=False, ttl=120)
@@ -166,14 +128,6 @@ def render_monitor() -> None:
     st.title("ICU 早期恶化预警 · 监测台")
     st.caption("S2 多时刻 · LightGBM + SHAP / GRU-D 时序 · 切换住院后按 stay/h 重新预测")
 
-    import os
-
-    for k in ("DATABASE_URL", "SQLALCHEMY_DATABASE_URI"):
-        os.environ.pop(k, None)
-    from infra.config import get_settings
-
-    get_settings.cache_clear()
-
     metrics = load_metrics_artifact() or {}
     mc1, mc2, mc3, mc4 = st.columns(4)
     mc1.metric("训练样本", f"{metrics.get('total_n', '—'):,}" if metrics.get("total_n") else "—")
@@ -192,7 +146,7 @@ def render_monitor() -> None:
     model_type_key = "grud" if model_type.startswith("GRU") else "lgbm"
     st.sidebar.caption(f"GRU-D 模型 {'可用 ✓' if has_gru else '未训练（运行 --train-gru）'}")
 
-    stays = list(_rich_stays(2500))
+    stays = list(_rich_stays_cached(2500))
     if not stays:
         st.error(
             "未找到可用特征行。请 restore S2 dump，并确认未再跑会清空 feat 的 P0 ETL。"
@@ -210,7 +164,7 @@ def render_monitor() -> None:
         choice = st.selectbox("ICU 住院（stay）", labels, key="mon_stay")
         stay_id = int(options[choice])
 
-        avail = list(_hours_for_stay(stay_id))
+        avail = list(_hours_for_stay_cached(stay_id))
         hours = avail if avail else list(cfg_hours)
         prefer = 1 if 1 in hours else hours[0]
         hour_key = f"mon_hour_{stay_id}"
