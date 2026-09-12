@@ -1,6 +1,6 @@
 """L4 GRU-D inference interface.
 
-Alignd with predict_patient output contract:
+Aligned with predict_patient output contract:
   {stay_id, status, risk_score, recommend, top_factors, ...}
 """
 

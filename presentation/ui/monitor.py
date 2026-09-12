@@ -259,7 +259,7 @@ def render_monitor() -> None:
     if int(result.get("stay_id") or 0) != stay_id or int(result.get("hour_index") or -1) != hour:
         st.warning("预测结果与当前选择不一致，正在重算…")
         _cached_predict.clear()
-        result = predict_patient(stay_id, hour_index=hour)
+        result = predict_patient(stay_id, hour_index=hour, model_type=model_type_key)
 
     score = float(result["risk_score"])
     kind = result.get("score_kind", "raw")
