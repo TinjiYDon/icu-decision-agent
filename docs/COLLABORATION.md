@@ -30,7 +30,7 @@
 | S3 | Streamlit 演示 | C | B 解释字段 | 选 stay_id 见分数 |
 | S4 | MCP（可选） | C | B 定义 schema | `predict_risk` JSON |
 
-任务清单：[`STATUS.md`](STATUS.md) · [`PROGRESS.md`](PROGRESS.md)
+任务清单：[`STATUS.md`](STATUS.md)
 
 ## 4. 对接契约
 

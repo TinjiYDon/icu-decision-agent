@@ -44,6 +44,6 @@ independent: zero hard couple to icu-scheduling-agent
 ## 相关
 
 - 变更史：[CHANGELOG.md](CHANGELOG.md)
-- 现状：[PROGRESS.md](PROGRESS.md) · [STATUS.md](STATUS.md)
+- 现状：[STATUS.md](STATUS.md)
 - 对标：[SOTA_SURVEY.md](SOTA_SURVEY.md) · 飞轮：[DATA_FLYWHEEL.md](DATA_FLYWHEEL.md)
 - 方法建议：[TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) · [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md)

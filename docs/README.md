@@ -6,9 +6,8 @@
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
-| [STATUS.md](STATUS.md) | 当前进度与指标 |
+| [STATUS.md](STATUS.md) | 当前进度、指标与里程碑 |
 | [TEAM_DIRECTION.md](TEAM_DIRECTION.md) | 组员方向同步 |
-| [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
 | [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
 | [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
 | [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore**（含特征口径） |

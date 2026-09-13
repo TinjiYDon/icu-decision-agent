@@ -37,6 +37,5 @@ release: decision-s2-console
 
 | 文档 | 用途 |
 |------|------|
-| [PROGRESS.md](PROGRESS.md) | 里程碑完成度 |
 | [ROADMAP.md](ROADMAP.md) | 下一版本 |
-| [STATUS.md](STATUS.md) | 指标与 dump |
+| [STATUS.md](STATUS.md) | 指标、dump 与里程碑 |
