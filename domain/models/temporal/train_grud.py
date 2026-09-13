@@ -15,7 +15,8 @@ import torch
 from sqlalchemy import bindparam, create_engine, text
 
 from domain.features.sequence_build import build_mask_delta, pad_truncate
-from domain.models.split import save_split_manifest, split_frame_by_stay
+from domain.features.sequence_etl import export_sequence_manifest, passes_sparse_gate
+from domain.models.split import load_split_assignment, save_split_manifest, split_frame_by_stay
 from domain.models.temporal.grud_model import GRUD, build_train_dataset
 from domain.models.temporal.attribution import FEATURE_NAMES
 from infra.config import get_data_source, get_layer0_dsn, load_yaml
@@ -35,8 +36,12 @@ EPOCHS = int(CFG.get("epochs", 20))
 BATCH_SIZE = int(CFG.get("batch_size", 64))
 LR = float(CFG.get("lr", 0.001))
 
-TS_FEATURES = CFG.get("feature_keys", ["hr", "sbp", "lactate", "creatinine", "resp_rate", "temperature", "spo2", "bun"])
+TS_FEATURES = list(FEATURE_NAMES)
 F = len(TS_FEATURES)
+_CFG_KEYS = CFG.get("feature_keys")
+if _CFG_KEYS and [str(k) for k in _CFG_KEYS] != TS_FEATURES:
+    # Keep training column order locked to FEATURE_NAMES; yaml is documentation.
+    pass
 
 
 def _itemids_for_features() -> dict[str, int]:
@@ -54,13 +59,20 @@ def _clip_value(itemid: int, val: float) -> float:
     return val
 
 
-def fetch_grud_sequences(stay_ids: list[int], batch_size: int = 500) -> tuple[list[dict], list[int]]:
-    """Fetch time-series for stays, batching to avoid PostgreSQL param limit."""
+def fetch_grud_sequences(
+    stay_ids: list[int], batch_size: int = 500
+) -> tuple[list[dict], list[int], list[int], int]:
+    """Fetch time-series for stays, batching to avoid PostgreSQL param limit.
+
+    Returns:
+      seqs, labels, valid_stay_ids, n_dropped_sparse
+    """
     source = get_data_source()
     itemid_map = _itemids_for_features()
 
     if source == "mock":
-        return _mock_sequences(stay_ids)
+        seqs, labels = _mock_sequences(stay_ids)
+        return seqs, labels, stay_ids[: len(seqs)], 0
 
     layer0_dsn = get_layer0_dsn()
     if not layer0_dsn:
@@ -70,6 +82,8 @@ def fetch_grud_sequences(stay_ids: list[int], batch_size: int = 500) -> tuple[li
 
     seqs: list[dict] = []
     labels: list[int] = []
+    valid_stay_ids: list[int] = []
+    n_dropped_sparse = 0
     vital_iids = [_itemids_for_features()[k] for k in ("hr", "sbp", "resp_rate", "temperature", "spo2")]
     lab_iids = [_itemids_for_features()[k] for k in ("lactate", "creatinine", "bun")]
     vital_sql = f"""
@@ -110,13 +124,18 @@ def fetch_grud_sequences(stay_ids: list[int], batch_size: int = 500) -> tuple[li
                 labs.setdefault(sid, {}).setdefault(iid, []).append((hrs, val))
         for sid in batch:
             seq = _build_sequence_from_raw(charts.get(sid, {}), labs.get(sid, {}), itemid_map)
-            if seq is not None:
-                seqs.append(seq)
-                labels.append(lmap.get(sid, 0))
+            if seq is None:
+                continue
+            if not passes_sparse_gate(seq["m"], feature_names_list=TS_FEATURES):
+                n_dropped_sparse += 1
+                continue
+            seqs.append(seq)
+            labels.append(lmap.get(sid, 0))
+            valid_stay_ids.append(sid)
         if bs % 5000 == 0:
             print(f"  [grud] progress: {min(bs + batch_size, len(stay_ids))}/{len(stay_ids)} stays, {len(seqs)} valid seqs")
 
-    return seqs, labels
+    return seqs, labels, valid_stay_ids, n_dropped_sparse
 
 
 def _build_sequence_from_raw(
@@ -180,21 +199,65 @@ def train_grud() -> dict:
         raise RuntimeError(f"too few stays: {len(stay_ids)}")
 
     print(f"  [grud] fetching {len(stay_ids)} sequences (lookback={LOOKBACK_HOURS}h)...")
-    seqs, labels = fetch_grud_sequences(stay_ids)
-    print(f"  [grud] got {len(seqs)} valid sequences, pos_rate={np.mean(labels):.3f}")
+    seqs, labels, valid_stay_ids, n_dropped_sparse = fetch_grud_sequences(stay_ids)
+    print(
+        f"  [grud] got {len(seqs)} valid sequences, dropped_sparse={n_dropped_sparse}, "
+        f"pos_rate={np.mean(labels):.3f}"
+    )
+    export_sequence_manifest(
+        stay_ids,
+        n_valid=len(seqs),
+        n_dropped_sparse=n_dropped_sparse,
+        extra={"pos_rate": float(np.mean(labels)) if labels else 0.0},
+    )
     if len(seqs) < 50: raise RuntimeError(f"too few sequences: {len(seqs)}")
 
     X_all, M_all, D_all, Y_all = build_train_dataset(seqs, labels)
     n = X_all.shape[0]
+    assert n == len(valid_stay_ids)
     import pandas as pd
-    df = pd.DataFrame({"stay_id": [stay_ids[i] for i in range(n)], "label": Y_all.numpy().astype(int)})
-    train_df, val_df, test_df, manifest = split_frame_by_stay(df)
-    save_split_manifest(manifest)
+    df = pd.DataFrame({"stay_id": valid_stay_ids, "label": Y_all.numpy().astype(int)})
+
+    assignment = None
+    if bool(CFG.get("use_lgbm_split_manifest", True)):
+        assignment = load_split_assignment()
+    if assignment:
+        # Same-split对照：reuse LGBM stay assignment; drop stays missing from GRU-D set.
+        parts = {"train": [], "val": [], "test": []}
+        for sid, y in zip(valid_stay_ids, Y_all.numpy().astype(int), strict=True):
+            split = assignment.get(int(sid))
+            if split in parts:
+                parts[split].append({"stay_id": int(sid), "label": int(y)})
+        train_df = pd.DataFrame(parts["train"])
+        val_df = pd.DataFrame(parts["val"])
+        test_df = pd.DataFrame(parts["test"])
+        if min(len(train_df), len(val_df), len(test_df)) < 5:
+            train_df, val_df, test_df, manifest = split_frame_by_stay(df)
+            save_split_manifest(manifest, name="split_manifest_grud.json")
+            split_mode = "recomputed"
+        else:
+            manifest = {
+                "seed": "lgbm_manifest",
+                "stratified": True,
+                "ratios": {"note": "reused_lgbm_assignment"},
+                "n_stays": {
+                    "train": int(train_df["stay_id"].nunique()),
+                    "val": int(val_df["stay_id"].nunique()),
+                    "test": int(test_df["stay_id"].nunique()),
+                },
+                "assignment": {str(s): assignment[int(s)] for s in valid_stay_ids if int(s) in assignment},
+            }
+            save_split_manifest(manifest, name="split_manifest_grud.json")
+            split_mode = "lgbm_manifest"
+    else:
+        train_df, val_df, test_df, manifest = split_frame_by_stay(df)
+        save_split_manifest(manifest, name="split_manifest_grud.json")
+        split_mode = "recomputed"
 
     train_ids, val_ids, test_ids = set(train_df["stay_id"]), set(val_df["stay_id"]), set(test_df["stay_id"])
-    mk = {"train": [stay_ids[i] in train_ids for i in range(n)],
-          "val": [stay_ids[i] in val_ids for i in range(n)],
-          "test": [stay_ids[i] in test_ids for i in range(n)]}
+    mk = {"train": [valid_stay_ids[i] in train_ids for i in range(n)],
+          "val": [valid_stay_ids[i] in val_ids for i in range(n)],
+          "test": [valid_stay_ids[i] in test_ids for i in range(n)]}
     X_tr, Y_tr = X_all[mk["train"]], Y_all[mk["train"]]
     X_va, Y_va = X_all[mk["val"]], Y_all[mk["val"]]
     X_te, Y_te = X_all[mk["test"]], Y_all[mk["test"]]
@@ -209,7 +272,10 @@ def train_grud() -> dict:
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([scale_pos], device=device))
 
-    print(f"  [grud] device={device}, train={len(X_tr)}, val={len(X_va)}, test={len(X_te)}, scale={scale_pos:.1f}")
+    print(
+        f"  [grud] device={device}, split={split_mode}, "
+        f"train={len(X_tr)}, val={len(X_va)}, test={len(X_te)}, scale={scale_pos:.1f}"
+    )
     loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_tr, M_tr, D_tr, Y_tr),
                                          batch_size=BATCH_SIZE, shuffle=True)
     best_auc, wait, best_state = 0.0, 0, None
@@ -242,7 +308,8 @@ def train_grud() -> dict:
                "total_n": int(n), "train_n": int(len(X_tr)), "val_n": int(len(X_va)), "test_n": int(len(X_te)),
                "positive": int(Y_all.sum()), "pos_rate": float(Y_all.mean()), "model": "grud",
                "lookback_hours": LOOKBACK_HOURS, "max_timesteps": MAX_TIMESTEPS,
-               "hidden_size": HIDDEN_SIZE, "scale_pos_weight": float(scale_pos), "feature_names": TS_FEATURES}
+               "hidden_size": HIDDEN_SIZE, "scale_pos_weight": float(scale_pos), "feature_names": TS_FEATURES,
+               "split_mode": split_mode, "n_dropped_sparse": int(n_dropped_sparse)}
     METRICS_PATH.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
     with app_eng.begin() as conn:
         conn.execute(text("INSERT INTO model.registry (name, version, path, metrics) VALUES ('grud_mortality', 'p3.0', :path, CAST(:metrics AS jsonb))"),
