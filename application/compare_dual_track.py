@@ -9,7 +9,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ART = ROOT / "artifacts" / "models"
 
-KEYS = ("roc_auc", "pr_auc", "brier", "n", "test_n", "positive", "pos_rate")
+KEYS = (
+    "roc_auc",
+    "pr_auc",
+    "brier",
+    "n",
+    "test_n",
+    "positive",
+    "pos_rate",
+    "operating_threshold",
+    "net_benefit_test_at_operating",
+    "net_benefit_treat_all_at_operating",
+)
 
 
 def _load(path: Path) -> dict:
@@ -36,8 +47,12 @@ def compare() -> dict:
         row["notes"].append("GRU-D metrics missing — run application.train_grud --real")
     if grud.get("split_mode"):
         row["grud_split_mode"] = grud["split_mode"]
-    row["primary_metrics"] = ["pr_auc", "brier"]
+    row["primary_metrics"] = ["pr_auc", "brier", "net_benefit_test_at_operating"]
     row["roc_auc_is_secondary"] = True
+    row["h1_note"] = (
+        "Prefer deathtime-v2 Brier + net benefit at operating threshold; "
+        "do not roll back to dod solely to inflate PR-AUC."
+    )
     return row
 
 

@@ -120,6 +120,8 @@ def train_and_save() -> dict:
     metrics["pr_auc_test"] = test_default["pr_auc"]
     metrics["brier_val"] = val_default["brier"]
     metrics["brier_test"] = test_default["brier"]
+    metrics["net_benefit_test_at_operating"] = test_operating.get("net_benefit_model")
+    metrics["net_benefit_treat_all_at_operating"] = test_operating.get("net_benefit_treat_all")
     metrics["prediction_hours"] = prediction_hours()
     metrics["n_stays"] = int(df["stay_id"].nunique())
 
