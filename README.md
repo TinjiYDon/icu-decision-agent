@@ -2,7 +2,7 @@
 
 独立开源项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
 
-**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/STATUS.md`](docs/STATUS.md)
+**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始
 
@@ -25,12 +25,13 @@ $env:PYTHONPATH = (Get-Location)
 | [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly 监测台 |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
 | [docs/STATUS.md](docs/STATUS.md) | 当前进度与指标 |
+| [docs/TEAM_DIRECTION.md](docs/TEAM_DIRECTION.md) | **组员方向同步（必读）** |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 本仓变更 / Release |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 下一版本 |
 | [docs/README.md](docs/README.md) | 文档索引 |
 
-**进行中**：PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9) SHAP+RAG+LLM（未计入已交付）。
+**主线**：解释链（SHAP→RAG→LLM）已合入；2026-09-13 起独立 CDSS 深挖见 [`docs/TEAM_DIRECTION.md`](docs/TEAM_DIRECTION.md)。
 
 ## 答辩演示
 
