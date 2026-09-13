@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 from sklearn.calibration import calibration_curve
@@ -17,6 +17,64 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+
+
+def net_benefit_at_threshold(
+    y_true: Any,
+    probability: Any,
+    *,
+    threshold: float,
+) -> dict[str, float]:
+    """Decision-curve net benefit at one fixed working-point threshold (H1)."""
+    y = np.asarray(y_true, dtype=int)
+    prob = np.asarray(probability, dtype=float)
+    t = float(threshold)
+    if not (0.0 < t < 1.0):
+        raise ValueError("threshold must be in (0, 1)")
+    n = max(len(y), 1)
+    pred = (prob >= t).astype(int)
+    tp = int(((pred == 1) & (y == 1)).sum())
+    fp = int(((pred == 1) & (y == 0)).sum())
+    prevalence = float(y.mean()) if len(y) else 0.0
+    odds = t / max(1.0 - t, 1e-9)
+    nb_model = tp / n - fp / n * odds
+    nb_all = prevalence - (1.0 - prevalence) * odds
+    return {
+        "threshold": t,
+        "net_benefit_model": float(nb_model),
+        "net_benefit_treat_all": float(nb_all),
+        "net_benefit_treat_none": 0.0,
+        "prevalence": prevalence,
+    }
+
+
+def net_benefit_curve(
+    y_true: Any,
+    probability: Any,
+    thresholds: Sequence[float] | np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Decision-curve analysis style net benefit vs threshold probability."""
+    y = np.asarray(y_true, dtype=int)
+    p = np.asarray(probability, dtype=float)
+    if thresholds is None:
+        thr = np.linspace(0.05, 0.80, 16)
+    else:
+        thr = np.asarray(list(thresholds), dtype=float)
+    nb_model: list[float] = []
+    nb_all: list[float] = []
+    for t in thr:
+        point = net_benefit_at_threshold(y, p, threshold=float(t))
+        nb_model.append(point["net_benefit_model"])
+        nb_all.append(point["net_benefit_treat_all"])
+    return {
+        "thresholds": [float(x) for x in thr],
+        "net_benefit_model": nb_model,
+        "net_benefit_treat_all": nb_all,
+        "net_benefit_treat_none": [0.0] * len(thr),
+        "n": int(len(y)),
+        "prevalence": float(y.mean()) if len(y) else 0.0,
+        "status": "ok",
+    }
 
 
 def select_threshold_by_f1(y_true, probability) -> float:
@@ -53,6 +111,11 @@ def binary_metrics(y_true, probability, *, threshold: float = 0.5) -> dict[str, 
     has_both_classes = len(np.unique(y)) > 1
     frac_pos, mean_pred = calibration_curve(y, prob, n_bins=10, strategy="quantile")
 
+    nb = (
+        net_benefit_at_threshold(y, prob, threshold=float(threshold))
+        if 0.0 < float(threshold) < 1.0
+        else None
+    )
     return {
         "n": int(len(y)),
         "positive": int(y.sum()),
@@ -66,6 +129,8 @@ def binary_metrics(y_true, probability, *, threshold: float = 0.5) -> dict[str, 
         "recall": float(recall_score(y, pred, zero_division=0)),
         "specificity": specificity,
         "f1": float(f1_score(y, pred, zero_division=0)),
+        "net_benefit_model": None if nb is None else nb["net_benefit_model"],
+        "net_benefit_treat_all": None if nb is None else nb["net_benefit_treat_all"],
         "confusion_matrix": {
             "tn": int(tn),
             "fp": int(fp),

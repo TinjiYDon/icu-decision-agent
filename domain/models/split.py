@@ -157,3 +157,21 @@ def save_split_manifest(manifest: dict[str, Any], name: str = "split_manifest_mo
     }
     path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def load_split_assignment(
+    name: str = "split_manifest_mortality_12h.json",
+) -> dict[int, str] | None:
+    """Load stay_id → {train,val,test} from LGBM (or prior) split manifest."""
+    path = ARTIFACT_DIR / name
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    raw = data.get("assignment") or {}
+    out: dict[int, str] = {}
+    for k, v in raw.items():
+        try:
+            out[int(k)] = str(v)
+        except (TypeError, ValueError):
+            continue
+    return out or None

@@ -480,4 +480,28 @@ def render_explain() -> None:
             unsafe_allow_html=True,
         )
 
+    # ── HITL：采纳 / 驳回 / 编辑（D2）────────────────────────
+    st.markdown("### 人机协同反馈")
+    st.caption("反馈写入本地 `artifacts/hitl/explain_audit.jsonl`，不依赖调度仓。")
+    decision = st.radio("对本解释的处置", ["accept", "reject", "edit"], horizontal=True, key="hitl_decision")
+    reason = st.text_input("理由（可选）", key="hitl_reason")
+    edited = ""
+    if decision == "edit":
+        edited = st.text_area("编辑后的解释文本", value=str((result.get("explanation") or {}).get("explanation") or ""), key="hitl_edit")
+    if st.button("提交反馈", key="hitl_submit"):
+        from domain.explain.hitl_audit import append_feedback
+
+        rec = result.get("recommend") or {}
+        band = rec.get("band") if isinstance(rec, dict) else rec
+        record = append_feedback(
+            stay_id=int(result.get("stay_id") or stay_id),
+            decision=decision,  # type: ignore[arg-type]
+            risk_score=float(result["risk_score"]) if result.get("risk_score") is not None else None,
+            recommend=str(band) if band is not None else None,
+            reason=reason,
+            edited_text=edited,
+            model_type=_model_type_key,
+        )
+        st.success(f"已记录：{record['decision']} @ {record['ts']}")
+
     disclaimer()
