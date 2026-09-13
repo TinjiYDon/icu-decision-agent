@@ -9,6 +9,6 @@
 | [#3](https://github.com/TinjiYDon/icu-decision-agent/issues/3) | S1 train+AUC（B） | ✅ closed（PR #6） |
 | [#4](https://github.com/TinjiYDon/icu-decision-agent/issues/4) | S1-2 dump restore（A） | ✅ closed（Owner restore 签收） |
 | [PR #6](https://github.com/TinjiYDon/icu-decision-agent/pull/6) | mj 分层基线评估 | ✅ merged |
-| 分支 `liujiawei` | 特征扩展 AUC≈0.89 | ⏸️ **L3 不合** · 见 [`LIUJIAWEI_HOLD.md`](LIUJIAWEI_HOLD.md) |
+| 分支 `liujiawei` | 特征扩展 AUC≈0.89 | ⏸️ **L3 不合** · 见 [`S1_EARLY_WARNING.md`](S1_EARLY_WARNING.md) |
 
 CI 模板：`docs/CI_WORKFLOW.yml`（需 GitHub token `workflow` scope 才能推到 `.github/workflows/`）

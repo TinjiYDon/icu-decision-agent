@@ -3,7 +3,8 @@
 | 文档 | 内容 |
 |------|------|
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
-| [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
+| [STATUS.md](STATUS.md) | 当前进度与指标 |
+| [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
 | [STATUS.md](STATUS.md) | 当前进度与指标 |
