@@ -15,16 +15,18 @@ release: decision-s2-console
 
 ## [Unreleased]
 
-- **Merged** PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9)：SHAP → RAG → LLM 解释页。
-- 标签路径 v2：优先 `admissions.deathtime`；**已在 Layer0 重算 label 并 `train --from-existing`**（test PR-AUC≈0.092）。
-- GRU-D 研究骨架：`domain/models/temporal` + `application.train_grud` smoke。
+- **Merged** PR [#11](https://github.com/TinjiYDon/icu-decision-agent/pull/11)：PyTorch GRU-D + 归因热力图 + 知识库。
+- 独立深挖叙事：AIGC 人机协同 CDSS；仓内 care_plan；不耦合 scheduling。
+- **D-LIT / D-FLY**：[`SOTA_SURVEY.md`](SOTA_SURVEY.md)、[`DATA_FLYWHEEL.md`](DATA_FLYWHEEL.md)、`application.summarize_hitl`。
+- D1：序列稀疏门控、同 split manifest、`train_grud --real`、`compare_dual_track`。
+- D2–D3：解释页 HITL audit；Streamlit「规划」页。
+- 标签路径 v2：优先 `admissions.deathtime`；dump 文档标明磁盘/库内版本差。
 
 ## 2026-08
 
-- **Merged** [#8](https://github.com/TinjiYDon/icu-decision-agent/pull/8)：S2 多时刻 `h∈{0,1,2,4,6}`，约 472k 行，stay 级同折。
-- **Merged** [#7](https://github.com/TinjiYDon/icu-decision-agent/pull/7)：S1 早期预警 `t=intime+1h` + 多指标 STATUS。
-- **Merged** [#6](https://github.com/TinjiYDon/icu-decision-agent/pull/6)：分层 baseline（PR-AUC / Brier）。
-- main：Plotly 监测台 v4、验收净受益、S2 dump 说明、MCP `predict_risk(hour_index)`。
+- **Merged** PR [#9](https://github.com/TinjiYDon/icu-decision-agent/pull/9)：SHAP → RAG → LLM 解释页。
+- **Merged** [#8](https://github.com/TinjiYDon/icu-decision-agent/pull/8) S2 多时刻；[#7](https://github.com/TinjiYDon/icu-decision-agent/pull/7) S1；[#6](https://github.com/TinjiYDon/icu-decision-agent/pull/6) 分层 baseline。
+- GRU-D 研究骨架（numpy smoke）与 deathtime 重训指标入 STATUS。
 - Release：[decision-s2-console](https://github.com/TinjiYDon/icu-decision-agent/releases/tag/decision-s2-console)。
 
 ## 更早

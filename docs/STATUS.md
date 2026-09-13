@@ -1,11 +1,12 @@
 # 项目状态
 
-> 更新：2026-08-14 · **标签 v2（deathtime）重训** · 主指标 PR-AUC / Brier  
-> **演示台**：总览 / 监测 / **解释（PR#9）** / 方法 / 调参 / 验收
+> 更新：2026-09-13 · **独立 CDSS 深挖** · 标签 v2（deathtime）· 主指标 PR-AUC / Brier  
+> **演示台**：总览 / 监测 / **解释（PR#9）** / 方法 / 调参 / 验收  
+> **叙事**：AIGC 人机协同决策 + 仓内规划建议；**不**耦合 scheduling 床位引擎
 
 ## 定位
 
-ICU **实时早期恶化预警**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`。
+ICU **实时早期恶化预警 + AIGC 人机协同 CDSS**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`。
 
 ## 对照简表
 
@@ -42,8 +43,17 @@ ICU **实时早期恶化预警**：预测时刻 `t=intime+h`，`h∈{0,1,2,4,6}`
 | S2 feat | ✅ 472,290（未改特征） |
 | Label v2 | ✅ 已重算并重训 |
 | 解释链 | ✅ PR #9 合入 · Streamlit「解释」 |
-| GRU-D | 🟡 骨架+synthetic smoke；Layer0 chart 前 6h 多为空，真序列 ETL 仍待 |
+| GRU-D | ✅ PR#11 已合；D1：稀疏门控 + 同 split manifest 对照 + `train_grud --real` / `compare_dual_track` |
+| HITL / care_plan | ✅ 解释页反馈 audit · Streamlit「规划」页 · 非床位调度 |
+| SOTA 对标 | ✅ [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
+| 数据飞轮 | ✅ [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `python -m application.summarize_hitl` |
 | S2 dump 文件 | ⚠️ 磁盘 dump 仍为旧标签版；**库内已是 v2**（需另打新 dump 才线下同步） |
+
+### 飞轮 KPI（填周汇总后）
+
+| KPI | 来源 | 当前 |
+|-----|------|------|
+| 周解释次数 / 采纳率 / 驳回率 / 编辑率 | `summarize_hitl` | 跑命令后写入本表 |
 
 ### 监测台注意
 
