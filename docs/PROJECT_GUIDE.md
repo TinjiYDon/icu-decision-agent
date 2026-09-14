@@ -60,7 +60,7 @@ L4：`predict_patient(stay_id, hour_index=…)` · `list_stays()` · 监测台 M
 | 阶段 | 命令 | 说明 |
 |------|------|------|
 | 连通性 | `scripts/check_env.py` | 含于 `run_data_pipeline` |
-| ETL | `application/run_etl_stage.py` | **数据阶段终点** |
+| ETL | `python -m application.etl_pipeline` | **数据阶段终点** |
 | 导出 | `scripts/export_layer1.ps1` | 输出到 `dumps/`（不入 Git） |
 | 冒烟 | `pytest tests/` | |
 | 模型 | `application.train --from-existing` | S2 dump 后推荐 |

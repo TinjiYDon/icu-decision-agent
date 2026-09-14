@@ -8,7 +8,7 @@
 |------|------|----------|----------|
 | **A** | 数据/基础设施 | `domain/etl/` `migrations/` `scripts/` `infra/` | `run_data_pipeline.ps1` |
 | **B** | 算法 | `domain/features/` `domain/labels/` `domain/models/` | `application/train.py` |
-| **C** | 应用/集成负责人 | `application/` `presentation/` `data_access/` | `application/run_p0.py` |
+| **C** | 应用/集成负责人 | `application/` `presentation/` `data_access/` | `application/train.py` |
 
 各目录详见同级 `OWNER.md`。
 

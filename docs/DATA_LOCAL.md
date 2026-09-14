@@ -33,7 +33,7 @@ layer0:
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\scripts\run_data_pipeline.ps1
-# 或分步：python -m application.run_etl_stage → .\scripts\export_layer1.ps1 -SchemasOnly
+# 或分步：python -m application.etl_pipeline → .\scripts\export_layer1.ps1 -SchemasOnly
 ```
 
 输出：`dumps/icu_decision_P0-etl_{layer0}_{N}stays_{date}.dump`
@@ -61,5 +61,4 @@ $env:PYTHONPATH = (Get-Location)
 
 ```powershell
 python -m application.train
-python -m application.run_p0
 ```

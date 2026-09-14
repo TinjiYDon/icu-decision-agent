@@ -42,4 +42,4 @@ if (-not $SkipEtl) {
     & $py -m application.etl_pipeline
 }
 
-Write-Host "Done. Next: python -m application.run_p0  (with PYTHONPATH=$root)"
+Write-Host "Done. Next: python -m application.train  (with PYTHONPATH=$root)"
