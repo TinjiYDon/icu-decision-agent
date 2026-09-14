@@ -85,15 +85,6 @@ GCS_SUB_COLS = ["gcs_eye", "gcs_verbal", "gcs_motor"]
 # ── 机械通气标志 ──
 VENT_COLS = ["vent_flag"]
 
-# ── Wave A 全量特征列（所有合法特征） ──
-WAVE_A_FULL_COLS = (
-    BASE_COLS + LAB_COLS + VITAL_COLS + ADMIT_COLS + GENETIC_COLS
-    + ELIX_COLS + SOFA_COLS + ABG_COLS + GCS_SUB_COLS + VENT_COLS
-    + [
-        "pre_icu_los_hours", "gcs_total", "vasopressor_1h",
-        "shock_index", "spo2_fio2_ratio",
-    ]
-)
 
 # ── Wave2.6 新特征 ──
 NEW_COLS = [
@@ -335,5 +326,4 @@ def build_features() -> dict:
         "feature_cols": FEATURE_COLS,
         "prediction_hours": hours,
         "hour_index": prediction_hour_index(),
-        "stored_feature_cols": WAVE_A_FULL_COLS,
     }

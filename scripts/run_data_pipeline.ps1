@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw "check_env failed" }
 
 if (-not $SkipEtl) {
     Write-Host "=== ETL (checkpoint: before train) ==="
-    & $py -m application.run_etl_stage
+    & $py -m application.etl_pipeline
     if ($LASTEXITCODE -ne 0) { throw "ETL failed" }
 }
 
