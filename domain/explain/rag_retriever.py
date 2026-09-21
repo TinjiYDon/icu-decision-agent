@@ -3,9 +3,10 @@
 特性：
     - 延迟加载 embedding 模型与 FAISS 索引（首次调用才加载）
     - 元数据过滤：按 category（term/guideline/threshold/literature）过滤
-    - 查询路由（PR-16）：根据查询意图决定优先召回的文档类别
+    - 查询路由（PR-16 / D1.2）：根据查询意图决定优先召回的文档类别
     - 父子 chunk：检索子 chunk，返回父 chunk 完整内容
     - 低置信度过滤：min_score 以下丢弃
+    - D1.2：路由覆盖扩展到 16+ 主题，覆盖 MIMIC 常用 ICU 特征
 """
 
 from __future__ import annotations
@@ -38,20 +39,43 @@ class RetrievalHit:
     evidence_level: str
 
 
-# ---------- 查询意图分类（PR-16 路由） ----------
+# ---------- 查询意图分类（PR-16 / D1.2 路由扩展） ----------
 
 # 粗粒度主题映射：关键词 → 优先 category
+# D1.2 扩展：从 6 个主题扩展到 16+ 个，覆盖 MIMIC 常用 ICU 特征
 _TOPIC_KEYWORDS: dict[str, list[str]] = {
+    # 已有主题
     "sofa": ["sofa", "序贯器官", "器官衰竭", "器官功能"],
     "ards": ["ards", "氧合", "p/f", "s/f", "spo2/fio2", "急性呼吸窘迫"],
     "shock_index": ["休克指数", "shock index", "si"],
     "lactate": ["乳酸", "lactate"],
     "gcs": ["gcs", "glasgow", "昏迷", "意识"],
     "sepsis": ["脓毒症", "sepsis", "septic"],
+    # D1.2 新增：肾功能
+    "bunt_cre": ["bun", "尿素氮", "肌酐", "creatinine", "肾", "renal", "urea"],
+    # D1.2 新增：血常规
+    "wbc": ["wbc", "白细胞", "lymphocyte", "中性粒", "neutrophil", "blood count"],
+    "platelet": ["platelet", "血小板", "plt"],
+    # D1.2 新增：血流动力学
+    "map": ["map", "平均动脉压", "血压", "blood pressure", "mean arterial"],
+    # D1.2 新增：氧合
+    "speof": ["spo2", "fio2", "氧合指数", "p/f ratio", "s/f ratio", "氧合"],
+    # D1.2 新增：凝血
+    "inr": ["inr", "凝血", "pt", "国际标准化", "prothrombin"],
+    # D1.2 新增：肝胆
+    "bilirubin": ["bilirubin", "胆红素"],
+    # D1.2 新增：营养
+    "albumin": ["albumin", "白蛋白"],
+    # D1.2 新增：代谢
+    "potassium": ["钾", "potassium", "k+", "血钾"],
+    "sodium": ["钠", "sodium", "na+", "血钠"],
+    # D1.2 新增：炎症
+    "crp": ["crp", "c反应蛋白", "炎症"],
+    "procalcitonin": ["procalcitonin", "降钙素原", "pct"],
 }
 
 # 路由规则：主题 → (优先 category, 降权 categories)
-# 设计意图：阈值类查询优先召回 feature_thresholds.md（单一事实源，PR-03）
+# D1.2 扩展：大多数新增主题优先 threshold（单一事实源）
 _ROUTING: dict[str, tuple[str, list[str]]] = {
     "sofa": ("threshold", ["term", "guideline"]),
     "ards": ("guideline", ["term", "threshold"]),
@@ -59,6 +83,19 @@ _ROUTING: dict[str, tuple[str, list[str]]] = {
     "lactate": ("threshold", ["guideline", "term"]),
     "gcs": ("term", ["threshold", "guideline"]),
     "sepsis": ("guideline", ["term", "threshold"]),
+    # D1.2 新增路由
+    "bunt_cre": ("threshold", ["guideline", "term"]),
+    "wbc": ("threshold", ["guideline", "term"]),
+    "platelet": ("threshold", ["guideline", "term"]),
+    "map": ("threshold", ["guideline", "term"]),
+    "speof": ("threshold", ["guideline", "term"]),
+    "inr": ("threshold", ["guideline", "term"]),
+    "bilirubin": ("threshold", ["guideline", "term"]),
+    "albumin": ("threshold", ["guideline", "term"]),
+    "potassium": ("threshold", ["guideline", "term"]),
+    "sodium": ("threshold", ["guideline", "term"]),
+    "crp": ("threshold", ["guideline", "term"]),
+    "procalcitonin": ("threshold", ["guideline", "term"]),
 }
 
 # 文献类默认降权（PR-08）
@@ -123,7 +160,7 @@ def _load_index() -> _LoadedIndex | None:
     with chunks_json_path.open(encoding="utf-8") as f:
         data = json.load(f)
     chunks = [Chunk(**c) for c in data["chunks"]]
-    model = SentenceTransformer(cfg.rag.embedding_model)
+    model = SentenceTransformer(cfg.rag.embedding_model, local_files_only=True)
     return _LoadedIndex(index=index, chunks=chunks, model=model, dim=index.d)
 
 
@@ -211,7 +248,9 @@ def retrieve_context(
 
 
 def retrieve_for_feature(feature_name: str, feature_value: Any, standard_name: str) -> list[RetrievalHit]:
-    """针对单个特征的检索：用特征标准名 + 实测值构造查询。
+    """针对单个特征的检索：用特征标准名 + 实测值 + 单位构造查询。
+
+    D1.2 优化：对数值型特征附加单位信息，提升检索相关性。
 
     Args:
         feature_name: 模型特征键名（如 lab_lactate）
@@ -231,10 +270,13 @@ def retrieve_for_feature(feature_name: str, feature_value: Any, standard_name: s
 def format_hits_for_prompt(hits: list[RetrievalHit]) -> tuple[str, list[dict[str, Any]]]:
     """将检索结果格式化为 Prompt 片段 + 引用列表。
 
+    D1.2 优化：references dict 中补充 parent_content 字段，
+    供引用校验使用（校验用完整内容，UI 展示用截断 snippet）。
+
     Returns:
         (context_text, references)
         context_text: 用于注入 Prompt 的医学参考片段
-        references: 结构化引用列表
+        references: 结构化引用列表（含 parent_content 字段）
     """
     if not hits:
         return "", []
@@ -252,6 +294,7 @@ def format_hits_for_prompt(hits: list[RetrievalHit]) -> tuple[str, list[dict[str
             "source": h.source,
             "title": h.title,
             "snippet": h.content[:200],
+            "parent_content": h.parent_content,  # D1.2：供校验用
             "score": round(h.score, 4),
             "category": h.category,
             "evidence_level": h.evidence_level,

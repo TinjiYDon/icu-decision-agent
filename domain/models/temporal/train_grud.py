@@ -22,7 +22,7 @@ from domain.models.temporal.attribution import FEATURE_NAMES
 from infra.config import get_data_source, get_layer0_dsn, load_yaml
 from infra.db import get_engine
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT_DIR = ROOT / "artifacts" / "models"
 MODEL_PATH = ARTIFACT_DIR / "grud_mortality.pt"
 METRICS_PATH = ARTIFACT_DIR / "metrics_grud.json"
