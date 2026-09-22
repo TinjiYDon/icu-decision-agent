@@ -1,4 +1,4 @@
-"""Plotly charts for decision console."""
+"""Plotly charts for decision console — enhanced with CI bands."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ from typing import Any, Sequence
 
 import plotly.graph_objects as go
 
-
 TEAL = "#0f766e"
 SLATE = "#334155"
 AMBER = "#b45309"
+TEAL_LIGHT = "rgba(15,118,110,0.15)"
+SLATE_LIGHT = "rgba(51,65,85,0.08)"
 
 
 def fig_risk_trajectory(points: Sequence[dict[str, Any]]) -> go.Figure:
@@ -130,6 +131,7 @@ def fig_hour_pr_auc(by_hour: dict[str, Any]) -> go.Figure:
 
 
 def fig_net_benefit(curve: dict[str, Any]) -> go.Figure:
+    """基础净受益曲线（无 CI）。"""
     thr = curve.get("thresholds") or []
     fig = go.Figure()
     fig.add_trace(
@@ -173,19 +175,127 @@ def fig_net_benefit(curve: dict[str, Any]) -> go.Figure:
     return fig
 
 
+def fig_net_benefit_with_ci(curve: dict[str, Any]) -> go.Figure:
+    """带 Bootstrap 95% CI 带的净受益曲线。
+
+    与 fig_net_benefit 相比额外绘制：
+    - 半透明 CI 带（上下限之间）
+    - 工作点标记（红色圆点 + 阈值标注）
+    """
+    thr = curve.get("thresholds") or []
+    nb_model = curve.get("nb_model") or curve.get("net_benefit_model") or []
+    nb_all = curve.get("nb_treat_all") or curve.get("net_benefit_treat_all") or []
+    ci_lo = curve.get("nb_model_ci_lower")
+    ci_hi = curve.get("nb_model_ci_upper")
+    wp = curve.get("working_point")
+
+    fig = go.Figure()
+
+    # CI 带（若存在）
+    if ci_lo is not None and ci_hi is not None and len(thr) == len(ci_lo) == len(ci_hi):
+        # 上边界（正向绘制）
+        fig.add_trace(go.Scatter(
+            x=thr + thr[::-1],
+            y=list(ci_hi) + list(reversed(ci_lo)),
+            fill="toself",
+            fillcolor=TEAL_LIGHT,
+            line=dict(color="transparent"),
+            showlegend=False,
+            name="95% CI",
+        ))
+        # CI 中线（虚线）
+        fig.add_trace(go.Scatter(
+            x=thr,
+            y=[(lo + hi) / 2 for lo, hi in zip(ci_lo, ci_hi)],
+            mode="lines",
+            line=dict(color=TEAL, dash="dot", width=1),
+            showlegend=False,
+        ))
+
+    # 模型净受益主曲线
+    fig.add_trace(go.Scatter(
+        x=thr,
+        y=nb_model,
+        mode="lines+markers",
+        name="模型净受益",
+        line=dict(color=TEAL, width=2.5),
+        marker=dict(size=5),
+    ))
+
+    # 全部干预基线
+    fig.add_trace(go.Scatter(
+        x=thr,
+        y=nb_all,
+        mode="lines",
+        name="全部干预",
+        line=dict(color=AMBER, dash="dash", width=2),
+    ))
+
+    # 全不干预基线（y=0）
+    if thr:
+        fig.add_trace(go.Scatter(
+            x=[thr[0], thr[-1]],
+            y=[0, 0],
+            mode="lines",
+            name="全不干预",
+            line=dict(color="#94a3b8", dash="dot", width=1.5),
+        ))
+
+    # 工作点标记
+    if wp:
+        wp_thr = wp.get("threshold", 0) if isinstance(wp, dict) else wp.threshold
+        # 在工作点处画一条竖线
+        if thr and wp_thr >= thr[0] and wp_thr <= thr[-1]:
+            fig.add_trace(go.Scatter(
+                x=[wp_thr, wp_thr],
+                y=[min(nb_model) * 1.5 if nb_model else -0.1, max(nb_model) * 1.5 if nb_model else 0.1],
+                mode="lines",
+                line=dict(color="#dc2626", dash="solid", width=1.5),
+                showlegend=False,
+                name=f"工作点 t={wp_thr:.3f}",
+            ))
+            # 在曲线上标红点
+            if nb_model:
+                idx = min(range(len(thr)), key=lambda i: abs(thr[i] - wp_thr))
+                fig.add_trace(go.Scatter(
+                    x=[thr[idx]],
+                    y=[nb_model[idx]],
+                    mode="markers",
+                    marker=dict(color="#dc2626", size=10, symbol="diamond"),
+                    showlegend=False,
+                    name="工作点",
+                ))
+
+    fig.update_layout(
+        title="决策曲线（净受益 Net Benefit）· Bootstrap 95% CI",
+        xaxis_title="阈值概率 (t)",
+        yaxis_title="净受益 (Net Benefit)",
+        height=400,
+        margin=dict(l=50, r=20, t=60, b=50),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,250,252,0.9)",
+        font=dict(color=SLATE),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        shapes=[
+            dict(
+                type="line", xref="paper", yref="paper",
+                x0=0.5, x1=0.5, y0=0, y1=1,
+                line=dict(color="#e2e8f0", dash="dot", width=1),
+            ),
+        ],
+    )
+    fig.update_xaxes(gridcolor="#e2e8f0", range=[0, max(0.5, (thr[-1] if thr else 0.5))])
+    fig.update_yaxes(gridcolor="#e2e8f0")
+    return fig
+
+
 def fig_dual_encoded_heatmap(
     values: list[list[float]],
     attributions: list[list[float]],
     feature_names: list[str],
     time_labels: list[str],
 ) -> go.Figure:
-    """Dual-encoded heatmap: time×feature grid.
-
-    X-axis: time steps (30-min intervals)
-    Y-axis: physiological features
-    Color: Per-feature normalized signed attribution — red=increases risk, blue=decreases risk
-    Cell text: actual feature value at that timestep (or "—" if missing)
-    """
+    """Dual-encoded heatmap: time×feature grid."""
     import numpy as np
 
     T = len(time_labels)
@@ -193,9 +303,6 @@ def fig_dual_encoded_heatmap(
     attr_arr = np.array(attributions) if (attributions is not None and len(attributions) > 0) else np.zeros((T, F))
     val_arr = np.array(values) if (values is not None and len(values) > 0) else np.zeros((T, F))
 
-    # Drop padded (negative-time) columns — they carry no observations by
-    # construction (pad_truncate zero-fills the head), so hiding them makes
-    # the chart denser without losing any information.
     keep = [i for i, lbl in enumerate(time_labels) if not str(lbl).startswith("pad")]
     if keep and len(keep) < T:
         time_labels = [time_labels[i] for i in keep]
@@ -203,12 +310,9 @@ def fig_dual_encoded_heatmap(
         attr_arr = attr_arr[keep, :]
         T = len(keep)
 
-    # Amplify tiny gradients caused by RNN vanishing-gradient over long sequences.
-    # This is a visualization-only scaling; it does NOT change the underlying model.
     ATTR_AMPLIFY = 100000.0
     attr_arr = attr_arr * ATTR_AMPLIFY
 
-    # Normalize each feature independently to [-1, 1] so colors are vivid
     normalized = np.zeros_like(attr_arr, dtype=float)
     for f_idx in range(F):
         col = attr_arr[:, f_idx]
@@ -216,13 +320,11 @@ def fig_dual_encoded_heatmap(
         if col_abs_max > 1e-12:
             normalized[:, f_idx] = col / col_abs_max
 
-    # Build text grid: show actual value or "—" for missing
     text_vals = []
     for t in range(T):
         row = []
         for f in range(F):
             v = val_arr[t, f]
-            # Handle both numeric and string values
             if isinstance(v, str):
                 row.append(v)
             elif np.isnan(v) or abs(float(v)) < 1e-6:
@@ -231,10 +333,8 @@ def fig_dual_encoded_heatmap(
                 row.append(f"{float(v):.1f}")
         text_vals.append(row)
 
-    # Plotly Heatmap expects z shaped (len(y), len(x)) = (F features, T timesteps).
-    # Our matrices are (T, F), so transpose both z and text.
     z_display = normalized.T.tolist()
-    text_display = [list(col) for col in zip(*text_vals)]  # transpose (T,F) -> (F,T)
+    text_display = [list(col) for col in zip(*text_vals)]
 
     fig = go.Figure(
         go.Heatmap(
@@ -242,11 +342,11 @@ def fig_dual_encoded_heatmap(
             x=time_labels,
             y=feature_names,
             colorscale=[
-                [0.0,  "#1565c0"],   # deep blue — max protective
-                [0.25, "#64b5f6"],   # light blue
-                [0.5,  "#ffffff"],   # white — neutral
-                [0.75, "#ff8a65"],   # light red
-                [1.0,  "#c62828"],   # deep red — max risk
+                [0.0,  "#1565c0"],
+                [0.25, "#64b5f6"],
+                [0.5,  "#ffffff"],
+                [0.75, "#ff8a65"],
+                [1.0,  "#c62828"],
             ],
             zmin=-1.0,
             zmax=1.0,
@@ -261,11 +361,7 @@ def fig_dual_encoded_heatmap(
             ),
             showscale=True,
             colorbar=dict(
-                title=dict(
-                    text="归因强度<br>(红↑风险 蓝↓保护)",
-                    side="right",
-                    font=dict(size=11),
-                ),
+                title=dict(text="归因强度<br>(红↑风险 蓝↓保护)", side="right", font=dict(size=11)),
                 tickfont=dict(size=9),
                 len=0.55,
                 thickness=14,

@@ -1,12 +1,12 @@
 # Export Layer1 database icu_decision to dumps/ (do not commit dumps to GitHub)
-# Usage: .\export_layer1.ps1 [-SchemasOnly] [-MimicSource mimic]
+# Usage: .\export_layer1.ps1 [-SchemasOnly] [-MimicSource mimic] [-Phase v2]
 param(
     [switch]$SchemasOnly,
     [string]$OutDir = "",
     [string]$PgHost = "localhost",
     [int]$PgPort = 5432,
     [string]$PgUser = "postgres",
-    [string]$PgPassword = "postgres",
+    [string]$PgPassword = "lewis790919",
     [string]$MimicSource = "mimic",
     [string]$Phase = "P0"
 )
