@@ -1,19 +1,17 @@
 # Dump 交付说明（队友 restore / 训练）
 
-> 更新：2026-09-15 · **S2 v2 deathtime dump** · **不入 GitHub** · 线下单发  
-> **标签版本注意**：库内已重算为 `mortality_12h_v2_deathtime`（阳性约 1.19%）。
-> D2 新增决策曲线分析（DCA + Bootstrap CI），见 `scripts/d2_dca_full.py`。
+> 更新：2026-09-13 · **S2 full dump** · **不入 GitHub** · 线下单发  
+> **标签版本注意**：库内已重算为 `mortality_12h_v2_deathtime`；下表「磁盘 dump」若仍为 20260802 文件，则 **restore 后需再跑 label 重算 + train**，或等待 Owner 另发 v2 dump。
 
 ## 单发文件（Owner → 队友）
 
 | 文件 | 绝对路径 | 说明 |
 |------|----------|------|
 | **主 dump（磁盘，可能仍为旧标签）** | `d:\project\icu-decision-agent\dumps\icu_decision_S2-full_mimic_94458stays_20260802.dump` | S2 · feat≈**472,290** · `h∈{0,1,2,4,6}` |
-| **v2 dump（推荐，含新标签）** | `d:\project\icu-decision-agent\dumps\icu_decision_S2-v2_deathtime_94458stays_<YYYYMMDD>.dump` | 同上 + 正确 mortality_12h_v2 标签 |
-| 元数据（可选） | `d:\project\icu-decision-agent\dumps\DATA_VERSION_<YYYYMMDD>_<HHMM>.json` | SHA / 行数说明 |
+| 元数据（可选） | `d:\project\icu-decision-agent\dumps\DATA_VERSION_20260802_1758.json` | SHA / 行数说明 |
 | **库内权威** | PostgreSQL Layer1 `label.mortality_12h` | **v2 deathtime**（阳性约 1.19%）；见 `docs/STATUS.md` |
-| **DCA 报告** | `artifacts/dca/dca_report_<YYYYMMDD>.json` | Bootstrap CI DCA 数值结果 |
-| **DCA 摘要** | `artifacts/dca/dca_summary_<YYYYMMDD>.txt` | 人类可读结论 |
+
+**SHA-256（20260802 文件）**：`5b71b752cb17bb8513c73682230329b1223a0baa7e52a791d3cd83e9409c1605`
 
 ### v2 对齐（restore 旧 dump 后）
 
@@ -24,31 +22,9 @@ $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.train   # 或项目内 label rebuild 入口
 # 若特征已在库： 
 .\.venv\Scripts\python.exe -m application.train --from-existing
-# 生成 DCA 报告
-.\.venv\Scripts\python.exe scripts\d2_dca_full.py --n_boot 500
 ```
 
-## D2 决策曲线分析（DCA）
-
-**用途**：在阳性率 ~1.2% 的稀有事件场景下，用净受益（Net Benefit）替代 ROC-AUC 评估临床价值。
-
-**CBR（代价比）约定**：`CBR = 1/9` → 工作阈值 `p_t = 0.1`，含义：临床医生愿意为 1 个真阳性接受 9 个假阳性。这是脓毒症/ICU 死亡率研究的常用标准。
-
-**运行**：
-```powershell
-# CLI 全量报告
-python scripts/d2_dca_full.py --cost_benefit_ratio 0.111 --n_boot 500
-# Streamlit 验收页自动调用（带 Bootstrap CI）
-streamlit run presentation/streamlit_app.py → 验收门禁
-```
-
-**输出字段**：
-| 字段 | 含义 |
-|------|------|
-| `working_nb` | 模型在 CBR=1/9 下的净受益 |
-| `treat_all_nb` | 全部干预的净受益（参考线） |
-| `ci_lower / ci_upper` | Bootstrap 95% CI（500 次重采样） |
-| `conclusion` | "✅ 模型净受益 > 全干预" 或 "⚠️ 阈值需调整" |
+待 Owner 导出新文件后，命名建议：`icu_decision_S2-v2_deathtime_<stays>_<YYYYMMDD>.dump`，并更新本表 SHA。
 
 ## 特征口径（答辩口径）
 
@@ -63,7 +39,7 @@ streamlit run presentation/streamlit_app.py → 验收门禁
 
 ```powershell
 cd d:\project\icu-decision-agent
-.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_S2-v2_deathtime_94458stays_<YYYYMMDD>.dump
+.\scripts\restore_layer1.ps1 -DumpFile .\dumps\icu_decision_S2-full_mimic_94458stays_20260802.dump
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe -m application.train --from-existing
 .\scripts\run_console.ps1

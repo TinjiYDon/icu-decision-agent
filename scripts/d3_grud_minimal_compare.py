@@ -179,10 +179,10 @@ def profile_nonnull_rates(
     vital_iids = [itemid_map[k] for k in ("hr", "sbp", "resp_rate", "temperature", "spo2")]
     lab_iids = [itemid_map[k] for k in ("lactate", "creatinine", "bun")]
 
-    # Step 1：获取所有 stay
+    # Step 1：获取所有 stay（统一用 h=6 标签，与 LGBM h=6 预测对齐）
     with app_eng.connect() as c:
         rows = c.execute(text(
-            "SELECT DISTINCT stay_id FROM label.mortality_12h WHERE hour_index = 0"
+            "SELECT DISTINCT stay_id FROM label.mortality_12h WHERE hour_index = 6"
         )).mappings().all()
     all_stay_ids = [int(r["stay_id"]) for r in rows]
     if limit > 0:
@@ -352,7 +352,7 @@ def train_and_predict_grud(
             WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '{lookback_hours} hours'
               AND l.valuenum IS NOT NULL AND l.itemid IN ({",".join(str(v) for v in lab_iids)})
               AND i.stay_id IN :sids ORDER BY i.stay_id, l.charttime"""
-        sql_lab = "SELECT stay_id, label FROM label.mortality_12h WHERE hour_index=0 AND stay_id IN :sids"
+        sql_lab = "SELECT stay_id, label FROM label.mortality_12h WHERE hour_index=6 AND stay_id IN :sids"
 
         for bs in range(0, len(ids), 500):
             batch = ids[bs:bs + 500]
@@ -539,7 +539,6 @@ def predict_lgbm_on_subset(
     if assignment is None:
         assignment = load_split_assignment()
     # 先查 sample_matrix h=6，找到同时有 LGBM 特征的 keepable stay
-    app_eng = get_engine()
     sids_str = ",".join(str(s) for s in keepable_stay_ids)
     with app_eng.connect() as c:
         rows = c.execute(text(
@@ -641,12 +640,23 @@ def paired_compare(
             notes=["样本量太小，建议扩大 keepable 子集或降低稀疏门控阈值"],
         )
 
-    # 对齐索引：取各自 test set 中属于 common 的预测
-    g_idx = [i for i, s in enumerate(grud.test_stay_ids) if s in common]
-    l_idx = [i for i, s in enumerate(lgbm.test_stay_ids) if s in common]
-    y_true = grud.test_y_true[g_idx]
-    g_prob = grud.test_y_prob[g_idx]
-    l_prob = lgbm.test_y_prob[l_idx]
+    # 构建 stay_id -> (y_true, prob) 的映射，确保正确对齐
+    g_map = {sid: (yt, yp) for sid, yt, yp in zip(grud.test_stay_ids, grud.test_y_true, grud.test_y_prob)}
+    l_map = {sid: yp for sid, yp in zip(lgbm.test_stay_ids, lgbm.test_y_prob)}
+
+    # 按 common stay_ids 顺序收集预测，确保 y_true 和 prob 对应同一 stay
+    y_true_list, g_prob_list, l_prob_list = [], [], []
+    for sid in common:
+        if sid in g_map and sid in l_map:
+            yt, gp = g_map[sid]
+            lp = l_map[sid]
+            y_true_list.append(yt)
+            g_prob_list.append(gp)
+            l_prob_list.append(lp)
+
+    y_true = np.array(y_true_list, dtype=int)
+    g_prob = np.array(g_prob_list, dtype=float)
+    l_prob = np.array(l_prob_list, dtype=float)
 
     if len(np.unique(y_true)) < 2:
         return PairedComparison(
