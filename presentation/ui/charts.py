@@ -130,40 +130,64 @@ def fig_hour_pr_auc(by_hour: dict[str, Any]) -> go.Figure:
 
 
 def fig_net_benefit(curve: dict[str, Any]) -> go.Figure:
+    """DCA curve with point estimates only (backward compat)."""
+    return fig_net_benefit_with_ci(curve, show_ci=False)
+
+
+def fig_net_benefit_with_ci(curve: dict[str, Any], *, show_ci: bool = True) -> go.Figure:
+    """DCA curve with optional bootstrap confidence interval band."""
     thr = curve.get("thresholds") or []
+    nb_model = curve.get("net_benefit_model") or []
+    nb_all = curve.get("net_benefit_treat_all") or []
+    ci_lo = curve.get("ci_lower")
+    ci_hi = curve.get("ci_upper")
+
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=thr,
-            y=curve.get("net_benefit_model") or [],
-            mode="lines+markers",
-            name="模型",
-            line=dict(color=TEAL, width=3),
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=thr,
-            y=curve.get("net_benefit_treat_all") or [],
-            mode="lines",
-            name="全部干预",
-            line=dict(color=AMBER, dash="dash"),
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=thr,
-            y=curve.get("net_benefit_treat_none") or [],
-            mode="lines",
-            name="全不干预",
-            line=dict(color="#94a3b8", dash="dot"),
-        )
-    )
+    # CI band
+    if show_ci and ci_lo is not None and ci_hi is not None and len(thr) == len(ci_lo) == len(ci_hi):
+        # Upper trace (forward)
+        fig.add_trace(go.Scatter(
+            x=thr + list(reversed(thr)),
+            y=ci_hi + list(reversed(ci_lo)),
+            fill="toself", fillcolor="rgba(15,118,110,0.15)",
+            line=dict(color="rgba(255,255,255,0)"),
+            showlegend=False, name="95% CI",
+            hoverinfo="skip",
+        ))
+    # Model NB
+    fig.add_trace(go.Scatter(
+        x=thr, y=nb_model,
+        mode="lines+markers", name="模型",
+        line=dict(color=TEAL, width=3),
+        marker=dict(size=8),
+    ))
+    # Treat-all
+    fig.add_trace(go.Scatter(
+        x=thr, y=nb_all,
+        mode="lines", name="全部干预",
+        line=dict(color=AMBER, dash="dash"),
+    ))
+    # Treat-none
+    fig.add_trace(go.Scatter(
+        x=thr, y=[0.0] * len(thr),
+        mode="lines", name="全不干预",
+        line=dict(color="#94a3b8", dash="dot"),
+    ))
+    # Mark working point if present
+    wp_thr = curve.get("working_threshold")
+    if wp_thr is not None and thr and nb_model:
+        idx = int(round((wp_thr - thr[0]) / (thr[-1] - thr[0]) * (len(thr) - 1)))
+        idx = max(0, min(idx, len(thr) - 1))
+        fig.add_trace(go.Scatter(
+            x=[thr[idx]], y=[nb_model[idx]],
+            mode="markers", name="工作点",
+            marker=dict(size=14, color="red", symbol="diamond"),
+        ))
     fig.update_layout(
-        title="决策曲线（净受益 Net Benefit）",
-        xaxis_title="阈值概率",
+        title="决策曲线（净受益 Net Benefit）" + (" · 含 Bootstrap 95% CI" if show_ci else ""),
+        xaxis_title="阈值概率 (p_t)",
         yaxis_title="净受益",
-        height=360,
+        height=400 if show_ci else 360,
         margin=dict(l=40, r=20, t=48, b=40),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(248,250,252,0.9)",

@@ -2,17 +2,73 @@
 
 from __future__ import annotations
 
+import lightgbm as lgb
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
 from application.acceptance import load_metrics_artifact, layer1_counts
 from application.demo_curves import compute_demo_net_benefit
-from presentation.ui.charts import fig_calibration, fig_net_benefit
+from domain.features.build import FEATURE_COLS
+from domain.models.dca import dca_curve_with_ci, dca_working_point
+from domain.models.lgbm import _get_model_bundle, _load_training_frame
+from domain.models.split import split_frame_by_stay
+from presentation.ui.charts import fig_calibration, fig_net_benefit, fig_net_benefit_with_ci
 from presentation.ui.theme import disclaimer
 
 STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
+_ARTIFACTS = Path(__file__).resolve().parents[3] / "artifacts" / "models"
+
+
+def _compute_dca_with_ci(*, max_rows: int = 5000) -> dict:
+    """Compute DCA with bootstrap CI on the LGBM test set."""
+    try:
+        booster, _ = _get_model_bundle()
+    except FileNotFoundError:
+        return {"status": "no_model", "message": "缺少 lgbm_mortality_12h.txt，请先训练"}
+    try:
+        df = _load_training_frame()
+        if len(df) < 50:
+            return {"status": "too_few", "message": f"样本过少 n={len(df)}"}
+        _, _, test_df, _ = split_frame_by_stay(df)
+        if len(test_df) > max_rows:
+            test_df = test_df.sample(n=max_rows, random_state=42)
+        X = test_df[FEATURE_COLS].to_numpy(dtype=float)
+        y = test_df["label"].to_numpy(dtype=int)
+        raw = booster.predict(X)
+        if np.any((raw < -50) | (raw > 50)):
+            prob = 1.0 / (1.0 + np.exp(-raw))
+        else:
+            prob = raw
+        cbr = 1.0 / 9.0
+        ci_result = dca_curve_with_ci(y, prob, n_boot=500, seed=42)
+        wp = dca_working_point(y, prob, cost_benefit_ratio=cbr)
+        return {
+            "status": "ok",
+            "n_boot": 500,
+            "cost_benefit_ratio": cbr,
+            "working_threshold": wp.threshold,
+            "working_nb": wp.net_benefit_model,
+            "treat_all_nb": wp.net_benefit_treat_all,
+            "n_samples": int(len(y)),
+            "positive_rate": float(y.mean()),
+            "ci_lower": ci_result.ci_lower_model,
+            "ci_upper": ci_result.ci_upper_model,
+            **({
+                "thresholds": ci_result.thresholds,
+                "net_benefit_model": ci_result.net_benefit_model,
+                "net_benefit_treat_all": ci_result.net_benefit_treat_all,
+            } if ci_result.thresholds else {}),
+            "conclusion": (
+                "✅ 模型净受益 > 全干预（CBR=1/9）"
+                if wp.net_benefit_model > wp.net_benefit_treat_all
+                else "⚠️ 模型净受益 ≤ 全干预，阈值需调整"
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "message": str(exc)}
 
 
 def render_accept() -> None:
@@ -91,8 +147,27 @@ def render_accept() -> None:
             "曲线高于「全不干预」且尽量高于「全部干预」的区间，表示阈值有临床净受益。"
         )
         st.plotly_chart(fig_net_benefit(curve), use_container_width=True)
-    else:
-        st.info(f"净受益曲线暂不可用：{curve.get('message', curve.get('status'))}")
+
+    st.subheader("决策曲线 · Bootstrap 95% 置信区间（D2）")
+    try:
+        ci_curve = _compute_dca_with_ci(max_rows=5000)
+        if ci_curve.get("status") == "ok":
+            st.caption(
+                f"Bootstrap n_boot={ci_curve.get('n_boot', 500)} · "
+                f"CBR={ci_curve.get('cost_benefit_ratio', 1/9):.4f} → 工作阈值 p_t={ci_curve.get('working_threshold', 0.1):.2%} · "
+                f"工作点 NB_model={ci_curve.get('working_nb', 0):.4f} vs NB_treat_all={ci_curve.get('treat_all_nb', 0):.4f}"
+            )
+            st.plotly_chart(fig_net_benefit_with_ci(ci_curve), use_container_width=True)
+            col1, col2, col3 = st.columns(3)
+            col1.metric("模型净受益", f"{ci_curve.get('working_nb', 0):.4f}")
+            col2.metric("全干预净受益", f"{ci_curve.get('treat_all_nb', 0):.4f}")
+            col3.metric("净受益增益", f"{(ci_curve.get('working_nb', 0) or 0) - (ci_curve.get('treat_all_nb', 0) or 0):.4f}")
+            if ci_curve.get("conclusion"):
+                st.success(ci_curve["conclusion"])
+        else:
+            st.info(f"Bootstrap DCA 暂不可用：{ci_curve.get('message', ci_curve.get('status'))}")
+    except Exception as exc:  # noqa: BLE001
+        st.warning(f"Bootstrap DCA 计算出错：{exc}")
 
     with st.expander("项目状态 STATUS.md"):
         if STATUS.exists():
