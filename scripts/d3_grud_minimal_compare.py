@@ -128,12 +128,15 @@ def _save_md_report(report: D3Report) -> None:
     ]
     for feat, rate in sorted(p.nonnull_rate_by_feature.items(), key=lambda x: -x[1]):
         lines.append(f"| {feat} | {rate:.1%} |")
+    # NaN-safe format helper
+    def _fmt(v): return f"{v:.4f}" if (v is not None and v == v) else "N/A"
+
     lines += ["", "## 二、AUC 配对比较", "",
               f"| 模型 | ROC-AUC（test） | n_test |",
               f"|------|---------------|--------|",
-              f"| GRU-D | {c.grud_roc_auc:.4f} | {report.grud.n_test} |",
-              f"| LGBM  | {c.lgbm_roc_auc:.4f} | {report.lgbm.n_test} |", "",
-              f"**差异（GRU-D − LGBM）**：{c.auc_diff:+.4f}",
+              f"| GRU-D | {_fmt(c.grud_roc_auc)} | {report.grud.n_test} |",
+              f"| LGBM  | {_fmt(c.lgbm_roc_auc)} | {report.lgbm.n_test} |", "",
+              f"**差异（GRU-D − LGBM）**：{_fmt(c.auc_diff) if c.auc_diff is not None else 'N/A'}",
               f"**DeLong 检验 p 值**：{c.p_value_debacka}", "",
               f"**D3 验收结论**：{'✅ 通过' if c.is_not_worse else '⚠️ 未通过'} — {c.conclusion}",
     ]
@@ -149,9 +152,12 @@ def profile_nonnull_rates(
     lookback_hours: int = 6,
     min_observed_cells: int = 3,
     min_obs_ratio: float = 0.05,
+    limit: int = 0,
 ) -> SequenceProfile:
     """查询 MIMIC-IV，刻画 6h 窗口内每个特征的观测非空率。
 
+    Args:
+        limit: 最大处理的 stay 数（0 = 全库）。
     返回 SequenceProfile（不可变），含 keepable_stay_ids 列表。
     """
     from infra.db import get_engine
@@ -179,8 +185,10 @@ def profile_nonnull_rates(
             "SELECT DISTINCT stay_id FROM label.mortality_12h WHERE hour_index = 0"
         )).mappings().all()
     all_stay_ids = [int(r["stay_id"]) for r in rows]
+    if limit > 0:
+        all_stay_ids = all_stay_ids[:limit]
     total = len(all_stay_ids)
-    print(f"  [D3] 总 stay 数：{total}")
+    print(f"  [D3] 总 stay 数：{total}" + (f"（限前{limit}条）" if limit > 0 else ""))
 
     # Step 2：批量拉取 chartevents + labevents，计算每个 stay 的非空率
     feat_null_counts: dict[str, list[int]] = {f: [] for f in FEATURE_NAMES}
@@ -514,9 +522,11 @@ def train_and_predict_grud(
 def predict_lgbm_on_subset(
     keepable_stay_ids: list[int],
     assignment: dict[int, str] | None = None,
+    hour_index: int = 6,
 ) -> ModelResult:
     """在 keepable_stay_ids 子集上用 LGBM 预测，返回 ModelResult。
     assignment：来自 LGBM manifest 的统一 split，确保两模型 split 一致。
+    hour_index：预测时间点（默认 6，与 GRU-D lookback 一致）。
     注意：只取 feat.sample_matrix 中存在的 stay（LGBM 需要聚合特征表）。
     """
     from application.predict_patient import predict_patient
@@ -528,14 +538,15 @@ def predict_lgbm_on_subset(
     app_eng = get_engine()
     if assignment is None:
         assignment = load_split_assignment()
-    # 先查 sample_matrix，找到同时有 LGBM 特征的 keepable stay
+    # 先查 sample_matrix h=6，找到同时有 LGBM 特征的 keepable stay
     app_eng = get_engine()
     sids_str = ",".join(str(s) for s in keepable_stay_ids)
     with app_eng.connect() as c:
         rows = c.execute(text(
             f"SELECT DISTINCT sm.stay_id FROM feat.sample_matrix sm"
             f" JOIN label.mortality_12h l ON sm.stay_id = l.stay_id AND sm.hour_index = l.hour_index"
-            f" WHERE sm.stay_id IN ({sids_str})")).mappings().all()
+            f" WHERE sm.stay_id IN ({sids_str}) AND sm.hour_index = {hour_index}"
+        )).mappings().all()
     lgbm_ids = [int(r["stay_id"]) for r in rows]
     print(f"  [D3/LGBM] keepable={len(keepable_stay_ids)}, sample_matrix中={len(lgbm_ids)}")
 
@@ -549,19 +560,19 @@ def predict_lgbm_on_subset(
         if s in parts:
             parts[s].append(sid)
 
-    # sample_matrix 当前只有 hour_index=0 的数据
+    # sample_matrix 当前只有 hour_index=6 的数据（补齐后）
     y_true_list, y_prob_list = [], []
     failed = 0
     # 先拉取标签（LGBM predict 不返回 label）
     sids_str = ",".join(str(s) for s in lgbm_ids)
     with app_eng.connect() as c:
         rows = c.execute(text(
-            f"SELECT stay_id, label FROM label.mortality_12h WHERE hour_index=0 AND stay_id IN ({sids_str})"
+            f"SELECT stay_id, label FROM label.mortality_12h WHERE hour_index={hour_index} AND stay_id IN ({sids_str})"
         )).mappings().all()
     label_map = {int(r["stay_id"]): int(r["label"]) for r in rows}
     for sid in lgbm_ids:
         try:
-            result = predict_patient(sid, hour_index=0, model_type="lgbm")
+            result = predict_patient(sid, hour_index=hour_index, model_type="lgbm")
             if result.get("status") == "ok":
                 y_true_list.append(label_map.get(sid, 0))
                 y_prob_list.append(float(result.get("risk_score", 0)))
@@ -778,8 +789,8 @@ def run(
         report = run_mock(limit)
     else:
         print(f"  [D3] 真实模式，lookback={lookback_hours}h, limit={limit}")
-        # 1. 非空率刻画
-        profile = profile_nonnull_rates(lookback_hours)
+        # 1. 非空率刻画（limit 控制采样规模）
+        profile = profile_nonnull_rates(lookback_hours, limit=limit)
         if profile.n_keepable < 20:
             raise RuntimeError(f"可训子集过小：{profile.n_keepable}，无法进行 D3 对照")
         # 2. 求与 sample_matrix 的交集（LGBM 需要聚合特征表）
@@ -809,9 +820,9 @@ def run(
         unified_assignment = load_split_assignment()
         if unified_assignment is None:
             print("  [D3] WARNING: 无 LGBM split manifest，使用随机划分")
-        # 4. GRU-D 训练 + LGBM 预测（使用同一 split）
+        # 4. GRU-D 训练 + LGBM 预测（使用同一 split，都在 h=6 比较）
         grud = train_and_predict_grud(use_ids, lookback_hours, assignment=unified_assignment)
-        lgbm = predict_lgbm_on_subset(use_ids, assignment=unified_assignment)
+        lgbm = predict_lgbm_on_subset(use_ids, assignment=unified_assignment, hour_index=lookback_hours)
         # 5. 配对比较（在共同 test set 上）
         comparison = paired_compare(grud, lgbm)
         report = D3Report(profile, grud, lgbm, comparison, elapsed_s=time.time() - t0,
