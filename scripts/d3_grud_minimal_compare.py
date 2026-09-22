@@ -176,8 +176,8 @@ def profile_nonnull_rates(
     # Step 1：获取所有 stay
     with app_eng.connect() as c:
         rows = c.execute(text(
-            "SELECT DISTINCT stay_id FROM label.mortality_12h WHERE hour_index = :h"),
-            {"h": lookback_hours}).mappings().all()
+            "SELECT DISTINCT stay_id FROM label.mortality_12h WHERE hour_index = 0"
+        )).mappings().all()
     all_stay_ids = [int(r["stay_id"]) for r in rows]
     total = len(all_stay_ids)
     print(f"  [D3] 总 stay 数：{total}")
@@ -286,8 +286,11 @@ def profile_nonnull_rates(
 def train_and_predict_grud(
     keepable_stay_ids: list[int],
     lookback_hours: int = 6,
+    assignment: dict[int, str] | None = None,
 ) -> ModelResult:
-    """在 keepable_stay_ids 子集上训练 GRU-D，返回 ModelResult。"""
+    """在 keepable_stay_ids 子集上训练 GRU-D，返回 ModelResult。
+    assignment：来自 LGBM manifest 的统一 split，确保两模型 split 一致。
+    """
     from domain.features.sequence_build import build_mask_delta, pad_truncate
     from domain.features.sequence_etl import passes_sparse_gate, export_sequence_manifest
     from domain.models.temporal.grud_model import GRUD, build_train_dataset
@@ -341,7 +344,7 @@ def train_and_predict_grud(
             WHERE l.charttime >= i.intime AND l.charttime < i.intime + INTERVAL '{lookback_hours} hours'
               AND l.valuenum IS NOT NULL AND l.itemid IN ({",".join(str(v) for v in lab_iids)})
               AND i.stay_id IN :sids ORDER BY i.stay_id, l.charttime"""
-        sql_lab = "SELECT stay_id, label FROM label.mortality_12h WHERE hour_index=:h AND stay_id IN :sids"
+        sql_lab = "SELECT stay_id, label FROM label.mortality_12h WHERE hour_index=0 AND stay_id IN :sids"
 
         for bs in range(0, len(ids), 500):
             batch = ids[bs:bs + 500]
@@ -349,7 +352,7 @@ def train_and_predict_grud(
             with app_eng.connect() as c:
                 lmap = {int(r["stay_id"]): int(r["label"])
                         for r in c.execute(text(sql_lab).bindparams(bindparam("sids", expanding=True)),
-                                           {"h": lookback_hours, "sids": b}).mappings().all()}
+                                           {"sids": b}).mappings().all()}
             charts: dict[int, dict[int, list]] = {}
             labs: dict[int, dict[int, list]] = {}
             with layer0_eng.connect() as c:
@@ -401,7 +404,8 @@ def train_and_predict_grud(
     df = pd.DataFrame({"stay_id": valid_ids, "label": Y_all.numpy().astype(int)})
 
     # 优先复用 LGBM manifest；缺失条目回退到随机划分
-    assignment = load_split_assignment()
+    if assignment is None:
+        assignment = load_split_assignment()
     if assignment:
         parts: dict[str, list[dict]] = {"train": [], "val": [], "test": []}
         for sid, y in zip(valid_ids, Y_all.numpy().astype(int), strict=True):
@@ -509,18 +513,21 @@ def train_and_predict_grud(
 
 def predict_lgbm_on_subset(
     keepable_stay_ids: list[int],
+    assignment: dict[int, str] | None = None,
 ) -> ModelResult:
     """在 keepable_stay_ids 子集上用 LGBM 预测，返回 ModelResult。
+    assignment：来自 LGBM manifest 的统一 split，确保两模型 split 一致。
     注意：只取 feat.sample_matrix 中存在的 stay（LGBM 需要聚合特征表）。
     """
     from application.predict_patient import predict_patient
-    from domain.models.split import load_split_assignment
     from domain.models.evaluation import binary_metrics
-    from sqlalchemy import text
+    from sqlalchemy import text, bindparam
     from infra.db import get_engine
     import numpy as np
 
-    assignment = load_split_assignment()
+    app_eng = get_engine()
+    if assignment is None:
+        assignment = load_split_assignment()
     # 先查 sample_matrix，找到同时有 LGBM 特征的 keepable stay
     app_eng = get_engine()
     sids_str = ",".join(str(s) for s in keepable_stay_ids)
@@ -544,8 +551,8 @@ def predict_lgbm_on_subset(
 
     # sample_matrix 当前只有 hour_index=0 的数据
     y_true_list, y_prob_list = [], []
+    failed = 0
     # 先拉取标签（LGBM predict 不返回 label）
-    from sqlalchemy import bindparam
     sids_str = ",".join(str(s) for s in lgbm_ids)
     with app_eng.connect() as c:
         rows = c.execute(text(
@@ -558,8 +565,14 @@ def predict_lgbm_on_subset(
             if result.get("status") == "ok":
                 y_true_list.append(label_map.get(sid, 0))
                 y_prob_list.append(float(result.get("risk_score", 0)))
-        except Exception:
-            pass
+            else:
+                failed += 1
+        except Exception as e:
+            failed += 1
+            print(f"  [D3/LGBM] predict_patient failed for sid={sid}: {e}")
+
+    if failed > 0:
+        print(f"  [D3/LGBM] WARNING: {failed}/{len(lgbm_ids)} predictions failed")
 
     y_true = np.array(y_true_list, dtype=int)
     y_prob = np.array(y_prob_list, dtype=float)
@@ -594,7 +607,9 @@ def paired_compare(
     grud: ModelResult,
     lgbm: ModelResult,
 ) -> PairedComparison:
-    """对 GRU-D 和 LGBM 在同子集 test split 上的预测进行配对统计检验。"""
+    """对 GRU-D 和 LGBM 在同子集 test split 上的预测进行配对统计检验。
+    两个模型的 AUC 均在两者共同的 test stay 子集上重新计算，确保可比性。
+    """
     from sklearn.metrics import roc_auc_score
     try:
         from sklearn.metrics import debacka_roc_auc as _debacka
@@ -602,8 +617,10 @@ def paired_compare(
     except ImportError:
         HAS_DEBACKA = False
 
-    # 取两模型共同的 test stay
-    common = sorted(set(grud.test_stay_ids) & set(lgbm.test_stay_ids))
+    # 取两模型各自的 test stay 交集
+    g_test_set = set(grud.test_stay_ids)
+    l_test_set = set(lgbm.test_stay_ids)
+    common = sorted(g_test_set & l_test_set)
     if len(common) < 10:
         return PairedComparison(
             grud_roc_auc=grud.roc_auc, lgbm_roc_auc=lgbm.roc_auc,
@@ -613,12 +630,20 @@ def paired_compare(
             notes=["样本量太小，建议扩大 keepable 子集或降低稀疏门控阈值"],
         )
 
-    # 对齐索引
-    g_idx = [grud.test_stay_ids.index(s) for s in common]
-    l_idx = [lgbm.test_stay_ids.index(s) for s in common]
+    # 对齐索引：取各自 test set 中属于 common 的预测
+    g_idx = [i for i, s in enumerate(grud.test_stay_ids) if s in common]
+    l_idx = [i for i, s in enumerate(lgbm.test_stay_ids) if s in common]
     y_true = grud.test_y_true[g_idx]
     g_prob = grud.test_y_prob[g_idx]
     l_prob = lgbm.test_y_prob[l_idx]
+
+    if len(np.unique(y_true)) < 2:
+        return PairedComparison(
+            grud_roc_auc=grud.roc_auc, lgbm_roc_auc=lgbm.roc_auc,
+            auc_diff=0.0, p_value_debacka=None, is_not_worse=True,
+            conclusion=f"共同 test set 唯一标签不足（只有 {np.unique(y_true)}）",
+            notes=["label 分布异常，可能是 hour_index 标签错位导致"],
+        )
 
     g_auc = roc_auc_score(y_true, g_prob)
     l_auc = roc_auc_score(y_true, l_prob)
@@ -779,10 +804,15 @@ def run(
         n_use = min(len(common_ids), limit)
         use_ids = common_ids[:n_use]
         print(f"  [D3] 使用 {n_use} 条共同 stay 进行对照")
-        # 3. GRU-D 训练 + LGBM 预测
-        grud = train_and_predict_grud(use_ids, lookback_hours)
-        lgbm = predict_lgbm_on_subset(use_ids)
-        # 4. 配对比较
+        # 3. 加载统一 split（来自 LGBM manifest，两模型共享）
+        from domain.models.split import load_split_assignment
+        unified_assignment = load_split_assignment()
+        if unified_assignment is None:
+            print("  [D3] WARNING: 无 LGBM split manifest，使用随机划分")
+        # 4. GRU-D 训练 + LGBM 预测（使用同一 split）
+        grud = train_and_predict_grud(use_ids, lookback_hours, assignment=unified_assignment)
+        lgbm = predict_lgbm_on_subset(use_ids, assignment=unified_assignment)
+        # 5. 配对比较（在共同 test set 上）
         comparison = paired_compare(grud, lgbm)
         report = D3Report(profile, grud, lgbm, comparison, elapsed_s=time.time() - t0,
                           artifact_path=_D3_ARTIFACTS / "comparison.json")

@@ -74,7 +74,7 @@ def pad_truncate(
         return x[-max_t:], m[-max_t:], d[-max_t:]
     pad = max_t - T
     return (
-        np.vstack([np.zeros((pad, F)), x]),
-        np.vstack([np.zeros((pad, F)), m]),
-        np.vstack([np.zeros((pad, F)), d]),
+        np.vstack([x, np.zeros((pad, F))]),
+        np.vstack([m, np.zeros((pad, F))]),
+        np.vstack([d, np.full((pad, F), np.inf)]),
     )
