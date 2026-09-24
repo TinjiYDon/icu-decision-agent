@@ -20,14 +20,14 @@
 |----|-----|------|
 | [#18](https://github.com/TinjiYDon/icu-decision-agent/pull/18) | decision | DX-1/2/3 解释·DCA·公平双轨 |
 | 后续 `8e7b482` | decision | PR-AUC/Brier 主验收纠偏 |
-| [#10](https://github.com/TinjiYDon/icu-scheduling-agent/pull/10) | scheduling | S2-MOO（H4） |
+| [#19](https://github.com/TinjiYDon/icu-decision-agent/pull/19) | decision | ADR-001：UI→L4 `ui_queries` |
 
-## 本批建议合入
+## 本批已处理
 
 | PR/分支 | 判据 | 动作 |
 |---------|------|------|
-| **ADR-001**（`fix/adr-001-rebase`） | **架构先进性**：UI→L4 `ui_queries`，禁 Streamlit 直连 DB | **合入** |
-| decision #15/#16/#17 · scheduling #9 | 清理无创新产出 | **关闭**（不占主线） |
+| **[#19](https://github.com/TinjiYDon/icu-decision-agent/pull/19)** ADR-001 | **架构先进性**：UI→L4 `ui_queries` | **已合入** `4814c52` |
+| decision #12/#15/#16/#17 · scheduling #9 | 清理无创新产出 | **已关闭** |
 
 ## 合入后仍不做宣称
 
