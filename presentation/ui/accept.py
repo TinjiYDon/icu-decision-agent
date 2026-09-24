@@ -1,4 +1,4 @@
-"""验收门禁 + 校准 + 决策净受益。"""
+"""验收门禁 + 校准 + 决策净受益（含 Bootstrap CI）。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ import streamlit as st
 
 from application.acceptance import load_metrics_artifact, layer1_counts
 from application.demo_curves import compute_demo_net_benefit
-from presentation.ui.charts import fig_calibration, fig_net_benefit
+from domain.models.dca import ART as DCA_ART
+from presentation.ui.charts import fig_calibration, fig_net_benefit, fig_net_benefit_with_ci
 from presentation.ui.theme import disclaimer
 
 STATUS = Path(__file__).resolve().parents[2] / "docs" / "STATUS.md"
@@ -82,17 +83,44 @@ def render_accept() -> None:
                     use_container_width=True,
                 )
 
-    st.subheader("决策曲线（净受益）")
-    with st.spinner("抽样测试集计算净受益（≤5k）…"):
-        curve = compute_demo_net_benefit()
-    if curve.get("status") == "ok":
+    st.subheader("决策曲线（净受益 + Bootstrap 95% CI）")
+    with st.spinner("加载 DCA 报告（含 CI 带）…"):
+        dca_files = sorted(DCA_ART.glob("dca_*.json")) if DCA_ART.exists() else []
+    if dca_files:
+        import json
+        latest = dca_files[-1]
+        dca_data = json.loads(latest.read_text(encoding="utf-8"))
         st.caption(
-            f"抽样 n={curve.get('sampled_n')} · 阳性率={curve.get('prevalence', 0):.2%} · "
-            "曲线高于「全不干预」且尽量高于「全部干预」的区间，表示阈值有临床净受益。"
+            f"来源：{latest.name} · "
+            f"样本 n={dca_data['curve']['n']:,} · "
+            f"阳性率={dca_data['curve']['prevalence']:.2%} · "
+            f"代价比 FP:FN={dca_data['curve']['cost_ratio']}:1 · "
+            f"Bootstrap={dca_data['curve']['n_bootstrap']} 次"
         )
-        st.plotly_chart(fig_net_benefit(curve), use_container_width=True)
+        wp = dca_data["curve"].get("working_point")
+        if wp:
+            st.markdown(
+                f"**工作点**：阈值 **{wp['threshold']:.4f}** "
+                f"（{wp['method']}）· "
+                f"精确率 {wp['precision']:.2%} · 召回率 {wp['recall']:.2%} · "
+                f"F1={wp['f1']:.4f} · 净受益 **{wp['net_benefit']:.4f}**"
+            )
+        has_ci = dca_data["curve"].get("nb_model_ci_lower") is not None
+        chart_fn = fig_net_benefit_with_ci if has_ci else fig_net_benefit
+        st.plotly_chart(chart_fn(dca_data["curve"]), use_container_width=True)
+        if has_ci:
+            st.caption(
+                "阴影区域为 Bootstrap 95% CI；"
+                "曲线在阈值范围内高于「全部干预」和「全不干预」基线，表示该阈值下存在临床净受益。"
+            )
     else:
-        st.info(f"净受益曲线暂不可用：{curve.get('message', curve.get('status'))}")
+        # fallback: 使用旧的 demo 曲线
+        curve = compute_demo_net_benefit()
+        if curve.get("status") == "ok":
+            st.caption(f"抽样 n={curve.get('sampled_n')} · 阳性率={curve.get('prevalence', 0):.2%}")
+            st.plotly_chart(fig_net_benefit(curve), use_container_width=True)
+        else:
+            st.info(f"净受益曲线暂不可用：{curve.get('message', curve.get('status'))}")
 
     with st.expander("项目状态 STATUS.md"):
         if STATUS.exists():

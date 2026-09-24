@@ -107,7 +107,7 @@ class GRUD(nn.Module):
             h_tilde = torch.tanh(self.W_h(
                 torch.cat([x_imputed, r * h_decayed], dim=-1)
             ))
-            h = (1.0 - z) * h + z * h_tilde
+            h = gamma_h * ((1.0 - z) * h + z * h_tilde)
 
             # Update running mean for next step
             x_hat = torch.where(m_t > 0.5, x_t, x_hat)

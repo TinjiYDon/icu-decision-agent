@@ -261,7 +261,7 @@ def build_index(verbose: bool = True) -> BuildResult:
     # 2. 加载 embedding 模型
     if verbose:
         print(f"  [加载] embedding 模型：{cfg.rag.embedding_model}")
-    model = SentenceTransformer(cfg.rag.embedding_model)
+    model = SentenceTransformer(cfg.rag.embedding_model, local_files_only=True)
 
     # 3. 生成 embedding
     texts = [c.content for c in all_chunks]

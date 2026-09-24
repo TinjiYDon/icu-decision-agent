@@ -119,6 +119,9 @@ def generate_explanation(
     risk_score: float,
     recommendation: dict[str, Any],
     features_display: dict[str, Any] | None = None,
+    *,
+    force_no_rag: bool = False,
+    force_empty_context: bool = False,
 ) -> dict[str, Any]:
     """生成患者风险的完整解释报告。
 
@@ -129,16 +132,8 @@ def generate_explanation(
         risk_score: 风险分数
         recommendation: L3 recommend_action() 返回的字典
         features_display: 可选，完整特征值字典
-
-    Returns:
-        {
-            "status": "ok" | "fallback",
-            "explanation": str,        # Markdown 解释文本
-            "structured": dict,        # JSON 结构化输出
-            "references": list,        # 溯源引用列表
-            "disclaimers": list,
-            "elapsed_ms": int,
-        }
+        force_no_rag: 强制走降级路径（不调用 LLM，返回规则模板输出），用于对照实验
+        force_empty_context: 有 RAG 但不传入 prompt，模拟「有知识库但 LLM 看不到」模式
     """
     cfg = get_config()
     t0 = time.time()
@@ -152,7 +147,7 @@ def generate_explanation(
     )
 
     # 2. RAG 检索（按特征检索）
-    rag_available = rag_is_available()
+    rag_available = rag_is_available() and not force_no_rag
     all_hits = []
     if rag_available:
         for sf in structured["factors"]:
@@ -170,15 +165,19 @@ def generate_explanation(
 
     rag_context, references = format_hits_for_prompt(all_hits)
 
-    # 3. 若 RAG 不可用，直接降级
+    # 3. 若 RAG 不可用（或 force_no_rag），直接降级
     if not rag_available:
         elapsed_ms = int((time.time() - t0) * 1000)
         result = _build_fallback_explanation(
             stay_id, hour_index, risk_score, risk_band_label, structured, rag_available=False
         )
         result["elapsed_ms"] = elapsed_ms
-        logger.info("[explain] RAG 不可用，降级输出，stay_id=%s, elapsed=%dms", stay_id, elapsed_ms)
+        logger.info("[explain] RAG 不可用/强制关闭，降级输出，stay_id=%s, elapsed=%dms", stay_id, elapsed_ms)
         return result
+
+    # 3b. 若 force_empty_context，保留检索结果但清空 context，模拟 LLM 无参考信息
+    effective_context = "" if force_empty_context else rag_context
+    effective_references = [] if force_empty_context else references
 
     # 4. 构造 Prompt
     shap_formatted = format_factors_for_prompt(structured)
@@ -187,7 +186,7 @@ def generate_explanation(
         risk_score=f"{risk_score:.1%}",
         risk_band_label=risk_band_label,
         shap_features_formatted=shap_formatted,
-        rag_context=rag_context,
+        rag_context=effective_context,
     )
 
     # 5. 调用 LLM
@@ -220,6 +219,15 @@ def generate_explanation(
 
     # 6. 解析 LLM 输出
     parsed = resp.parsed
+    if not parsed and resp.content:
+        # LLM 未走 Function Calling，尝试从 content 解析 JSON
+        content = resp.content.strip()
+        if content.startswith("{"):
+            try:
+                parsed = json.loads(content)
+                logger.info("[explain] 从 content 恢复 JSON 输出")
+            except json.JSONDecodeError:
+                pass
     if not parsed:
         # Function Calling 失败，尝试从 content 解析 JSON
         elapsed_ms = int((time.time() - t0) * 1000)
@@ -271,9 +279,15 @@ def generate_explanation(
         # 因果词替换
         fa["clinical_interpretation"] = sanitize_causal_words(interp)
 
-    # 8. 引用一致性校验
-    factor_analysis = validate_factor_references(factor_analysis, references)
-    references = mark_references_validity(references, factor_analysis)
+    # 8. 引用一致性校验（force_empty_context 时 references 为空，全部无效）
+    if effective_references:
+        factor_analysis = validate_factor_references(factor_analysis, effective_references)
+        references_out = mark_references_validity(effective_references, factor_analysis)
+    else:
+        # 无引用：所有 factor 标记 reference_valid=false
+        for fa in factor_analysis:
+            fa["reference_valid"] = False
+        references_out = []
 
     # 9. 补充每个 factor 的 value/unit/shap 等字段（从 structured 取）
     sf_map = {sf["feature"]: sf for sf in structured["factors"]}
@@ -283,6 +297,7 @@ def generate_explanation(
         fa.setdefault("unit", sf.get("unit", ""))
         fa.setdefault("shap", sf.get("shap", 0))
         fa.setdefault("shap_direction", sf.get("shap_direction", "positive"))
+        fa.setdefault("reference_valid", False)
 
     # 10. 组装最终输出
     summary = parsed.get("summary", "")
@@ -300,16 +315,18 @@ def generate_explanation(
         value_str = f"{fa.get('value')} {fa.get('unit', '')}".strip() if fa.get("value") is not None else "缺失"
         md_lines.append(f"{i}. **{sn}**（实测值：{value_str}，SHAP贡献：{fa.get('shap', 0)}）")
         md_lines.append(f"   {fa.get('clinical_interpretation', '')}")
-        if fa.get("reference_id") and fa.get("reference_valid"):
-            md_lines.append(f"   📚 引用：{fa['reference_id']}")
-        elif fa.get("reference_id") and not fa.get("reference_valid"):
-            md_lines.append(f"   ⚠️ 引用 {fa['reference_id']} 校验未通过")
+        ref_id = fa.get("reference_id", "")
+        ref_valid = fa.get("reference_valid", False)
+        if ref_id and ref_valid:
+            md_lines.append(f"   📚 引用：{ref_id}")
+        elif ref_id and not ref_valid:
+            md_lines.append(f"   ⚠️ 引用 {ref_id} 校验未通过")
     md_lines.append("")
     md_lines.append(f"**覆盖度**：{coverage_note}")
     md_lines.append("")
-    if references:
+    if references_out:
         md_lines.append("**解释溯源**：")
-        for ref in references:
+        for ref in references_out:
             valid_mark = "✓" if ref.get("valid") else "✗"
             md_lines.append(f"- [{ref['id']}] {valid_mark} {ref['source']} - {ref['title']}（相似度 {ref.get('score', 0)}）")
         md_lines.append("")
@@ -328,24 +345,26 @@ def generate_explanation(
         "factor_analysis": factor_analysis,
         "coverage_pct": structured["coverage_pct"],
         "coverage_note": coverage_note,
-        "references": references,
+        "references": references_out,
         "disclaimers": DISCLAIMERS,
         "rag_available": rag_available,
         "fallback_mode": False,
         "llm_available": True,
         "llm_usage": resp.usage,
+        "mode": "force_no_rag" if force_no_rag else ("force_empty_context" if force_empty_context else "full"),
     }
 
     logger.info(
-        "[explain] 完成 stay_id=%s, factors=%d, refs=%d, elapsed=%dms, tokens=%s",
-        stay_id, len(factor_analysis), len(references), elapsed_ms, resp.usage,
+        "[explain] 完成 stay_id=%s, factors=%d, refs=%d, elapsed=%dms, mode=%s, tokens=%s",
+        stay_id, len(factor_analysis), len(references_out), elapsed_ms,
+        final_structured["mode"], resp.usage,
     )
 
     return {
         "status": "ok",
         "explanation": "\n".join(md_lines),
         "structured": final_structured,
-        "references": references,
+        "references": references_out,
         "disclaimers": DISCLAIMERS,
         "elapsed_ms": elapsed_ms,
     }
