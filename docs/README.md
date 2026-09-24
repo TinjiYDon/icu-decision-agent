@@ -8,6 +8,7 @@
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
 | [STATUS.md](STATUS.md) | 当前进度与指标 |
 | [TEAM_DIRECTION.md](TEAM_DIRECTION.md) | 组员方向同步 |
+| [INTEGRATION_PREP.md](INTEGRATION_PREP.md) | 代码整合准备清单 |
 | [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
 | [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
 | [ROADMAP.md](ROADMAP.md) | 下一版本目标 |

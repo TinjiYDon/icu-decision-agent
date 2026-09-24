@@ -65,14 +65,24 @@ class ModelResult:
 
 @dataclass(frozen=True)
 class PairedComparison:
-    """GRU-D vs LGBM 在同子集上的配对比较。"""
-    grud_roc_auc: float
+    """GRU-D vs LGBM 在同子集上的配对比较。
+
+    主验收指标：**PR-AUC / Brier**（H2）；ROC-AUC 仅对照。
+    """
+    grud_pr_auc: float
+    lgbm_pr_auc: float
+    pr_auc_diff: float                 # GRU - LGBM（越高越好）
+    grud_brier: float
+    lgbm_brier: float
+    brier_diff: float                  # GRU - LGBM（越低越好，负差表示 GRU 更好）
+    grud_roc_auc: float                # 对照
     lgbm_roc_auc: float
-    auc_diff: float                    # GRU - LGBM
-    p_value_debacka: float | None
-    is_not_worse: bool                # D3 主验收条件
+    auc_diff: float                    # ROC：GRU - LGBM（对照）
+    p_value_debacka: float | None      # ROC DeLong（对照，可选）
+    is_not_worse: bool                 # 主验收：PR-AUC 不显著劣于（见 paired_compare）
     conclusion: str
     notes: list[str] = field(default_factory=list)
+    primary_metric: str = "pr_auc"
 
 
 @dataclass
@@ -131,14 +141,15 @@ def _save_md_report(report: D3Report) -> None:
     # NaN-safe format helper
     def _fmt(v): return f"{v:.4f}" if (v is not None and v == v) else "N/A"
 
-    lines += ["", "## 二、AUC 配对比较", "",
-              f"| 模型 | ROC-AUC（test） | n_test |",
-              f"|------|---------------|--------|",
-              f"| GRU-D | {_fmt(c.grud_roc_auc)} | {report.grud.n_test} |",
-              f"| LGBM  | {_fmt(c.lgbm_roc_auc)} | {report.lgbm.n_test} |", "",
-              f"**差异（GRU-D − LGBM）**：{_fmt(c.auc_diff) if c.auc_diff is not None else 'N/A'}",
-              f"**DeLong 检验 p 值**：{c.p_value_debacka}", "",
-              f"**D3 验收结论**：{'✅ 通过' if c.is_not_worse else '⚠️ 未通过'} — {c.conclusion}",
+    lines += ["", "## 二、主指标配对比较（PR-AUC / Brier）", "",
+              f"| 模型 | **PR-AUC** | **Brier** | ROC-AUC（对照） | n_test |",
+              f"|------|-----------|-----------|-----------------|--------|",
+              f"| GRU-D | {_fmt(c.grud_pr_auc)} | {_fmt(c.grud_brier)} | {_fmt(c.grud_roc_auc)} | {report.grud.n_test} |",
+              f"| LGBM  | {_fmt(c.lgbm_pr_auc)} | {_fmt(c.lgbm_brier)} | {_fmt(c.lgbm_roc_auc)} | {report.lgbm.n_test} |", "",
+              f"**PR-AUC 差（GRU−LGBM）**：{_fmt(c.pr_auc_diff)}",
+              f"**Brier 差（GRU−LGBM，负更好）**：{_fmt(c.brier_diff)}",
+              f"**ROC 差（对照）**：{_fmt(c.auc_diff)} · DeLong p={c.p_value_debacka}", "",
+              f"**D3 验收（主：PR-AUC 不劣）**：{'✅ 通过' if c.is_not_worse else '⚠️ 未通过'} — {c.conclusion}",
     ]
     if c.notes:
         lines += ["", "### 备注", ""] + [f"- {n}" for n in c.notes]
@@ -617,34 +628,48 @@ def paired_compare(
     grud: ModelResult,
     lgbm: ModelResult,
 ) -> PairedComparison:
-    """对 GRU-D 和 LGBM 在同子集 test split 上的预测进行配对统计检验。
-    两个模型的 AUC 均在两者共同的 test stay 子集上重新计算，确保可比性。
-    """
-    from sklearn.metrics import roc_auc_score
+    """同子集 test 上配对比较。主验收：PR-AUC；Brier 辅证；ROC 仅对照。"""
+    from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
+
     try:
         from sklearn.metrics import debacka_roc_auc as _debacka
         HAS_DEBACKA = True
     except ImportError:
         HAS_DEBACKA = False
 
-    # 取两模型各自的 test stay 交集
+    def _empty(**kwargs) -> PairedComparison:
+        base = dict(
+            grud_pr_auc=float("nan"),
+            lgbm_pr_auc=float("nan"),
+            pr_auc_diff=0.0,
+            grud_brier=float("nan"),
+            lgbm_brier=float("nan"),
+            brier_diff=0.0,
+            grud_roc_auc=grud.roc_auc,
+            lgbm_roc_auc=lgbm.roc_auc,
+            auc_diff=(grud.roc_auc - lgbm.roc_auc)
+            if (grud.roc_auc == grud.roc_auc and lgbm.roc_auc == lgbm.roc_auc)
+            else 0.0,
+            p_value_debacka=None,
+            is_not_worse=True,
+            notes=[],
+            primary_metric="pr_auc",
+        )
+        base.update(kwargs)
+        return PairedComparison(**base)
+
     g_test_set = set(grud.test_stay_ids)
     l_test_set = set(lgbm.test_stay_ids)
     common = sorted(g_test_set & l_test_set)
     if len(common) < 10:
-        return PairedComparison(
-            grud_roc_auc=grud.roc_auc, lgbm_roc_auc=lgbm.roc_auc,
-            auc_diff=grud.roc_auc - lgbm.roc_auc,
-            p_value_debacka=None, is_not_worse=True,
+        return _empty(
             conclusion=f"共同 test 样本不足（{len(common)}），无法配对比较",
             notes=["样本量太小，建议扩大 keepable 子集或降低稀疏门控阈值"],
         )
 
-    # 构建 stay_id -> (y_true, prob) 的映射，确保正确对齐
     g_map = {sid: (yt, yp) for sid, yt, yp in zip(grud.test_stay_ids, grud.test_y_true, grud.test_y_prob)}
     l_map = {sid: yp for sid, yp in zip(lgbm.test_stay_ids, lgbm.test_y_prob)}
 
-    # 按 common stay_ids 顺序收集预测，确保 y_true 和 prob 对应同一 stay
     y_true_list, g_prob_list, l_prob_list = [], [], []
     for sid in common:
         if sid in g_map and sid in l_map:
@@ -659,18 +684,21 @@ def paired_compare(
     l_prob = np.array(l_prob_list, dtype=float)
 
     if len(np.unique(y_true)) < 2:
-        return PairedComparison(
-            grud_roc_auc=grud.roc_auc, lgbm_roc_auc=lgbm.roc_auc,
-            auc_diff=0.0, p_value_debacka=None, is_not_worse=True,
+        return _empty(
             conclusion=f"共同 test set 唯一标签不足（只有 {np.unique(y_true)}）",
             notes=["label 分布异常，可能是 hour_index 标签错位导致"],
         )
 
-    g_auc = roc_auc_score(y_true, g_prob)
-    l_auc = roc_auc_score(y_true, l_prob)
-    diff = g_auc - l_auc
+    g_pr = float(average_precision_score(y_true, g_prob))
+    l_pr = float(average_precision_score(y_true, l_prob))
+    g_br = float(brier_score_loss(y_true, g_prob))
+    l_br = float(brier_score_loss(y_true, l_prob))
+    g_auc = float(roc_auc_score(y_true, g_prob))
+    l_auc = float(roc_auc_score(y_true, l_prob))
+    pr_diff = g_pr - l_pr
+    br_diff = g_br - l_br
+    roc_diff = g_auc - l_auc
 
-    # DeLong 检验
     p_val = None
     if HAS_DEBACKA:
         try:
@@ -678,33 +706,48 @@ def paired_compare(
         except Exception:
             p_val = None
 
-    # 决策：D3 验收条件
-    notes = []
-    is_not_worse = True
-    if p_val is not None:
-        if diff >= 0 and p_val > 0.05:
-            conclusion = f"GRU-D AUC={g_auc:.4f} 不显著优于 LGBM AUC={l_auc:.4f}（p={p_val:.3f}），但无显著劣化，D3 验收通过（负结果也成立）"
-            notes.append(f"DeLong p={p_val:.3f}，差异不显著，时序信息可能未提供增量价值")
-        elif diff > 0 and p_val <= 0.05:
-            conclusion = f"GRU-D AUC={g_auc:.4f} 显著优于 LGBM AUC={l_auc:.4f}（p={p_val:.3f}），时序信息有价值 ✅"
-            is_not_worse = True
-        elif diff <= 0 and p_val <= 0.05:
-            conclusion = f"⚠️ GRU-D AUC={g_auc:.4f} 显著劣于 LGBM AUC={l_auc:.4f}（p={p_val:.3f}），时序信息可能有害，需排查"
-            is_not_worse = False
-            notes.append("GRU-D 表现显著差于 LGBM，建议检查数据质量或模型超参")
+    # 主验收：PR-AUC 相对 LGBM 不劣于 0.02（绝对）
+    PR_SLACK = 0.02
+    notes = [
+        f"主指标 PR-AUC：GRU={g_pr:.4f} vs LGBM={l_pr:.4f}（差 {pr_diff:+.4f}）",
+        f"辅证 Brier：GRU={g_br:.4f} vs LGBM={l_br:.4f}（差 {br_diff:+.4f}，负更好）",
+        f"对照 ROC-AUC：GRU={g_auc:.4f} vs LGBM={l_auc:.4f}（DeLong p={p_val}）",
+    ]
+    is_not_worse = pr_diff >= -PR_SLACK
+    if is_not_worse:
+        if pr_diff >= 0:
+            conclusion = (
+                f"GRU-D PR-AUC={g_pr:.4f} ≥ LGBM={l_pr:.4f}；"
+                f"Brier {g_br:.4f} vs {l_br:.4f}。D3 主验收通过（ROC 仅对照）"
+            )
         else:
-            conclusion = f"GRU-D AUC={g_auc:.4f} vs LGBM AUC={l_auc:.4f}（p={p_val:.3f}），差异不显著，D3 验收通过"
+            conclusion = (
+                f"GRU-D PR-AUC={g_pr:.4f} 略低于 LGBM={l_pr:.4f}（差 {pr_diff:.4f}，"
+                f"容差 {PR_SLACK} 内）。D3 主验收通过；负结果可解释为时序无增量"
+            )
+            notes.append("PR-AUC 略低但仍在容差内，勿用 ROC 单独宣称时序优势")
     else:
-        if diff >= 0:
-            conclusion = f"GRU-D AUC={g_auc:.4f} ≥ LGBM AUC={l_auc:.4f}，无显著劣化，D3 验收通过（负结果）"
-        else:
-            conclusion = f"GRU-D AUC={g_auc:.4f} < LGBM AUC={l_auc:.4f}，因无法做 DeLong 检验暂无法判定，但差异 {abs(diff):.4f} 较小，建议视为通过"
-            notes.append("sklearn 无 debacka_roc_auc，建议使用 sklearn>=1.5 或手动实现 DeLong")
+        conclusion = (
+            f"⚠️ GRU-D PR-AUC={g_pr:.4f} 明显低于 LGBM={l_pr:.4f}（差 {pr_diff:.4f}）。"
+            f"D3 主验收未通过；请排查数据/超参（勿用 ROC 掩盖）"
+        )
+        notes.append("主指标 PR-AUC 劣化超出容差")
 
     return PairedComparison(
-        grud_roc_auc=g_auc, lgbm_roc_auc=l_auc, auc_diff=diff,
-        p_value_debacka=p_val, is_not_worse=is_not_worse,
-        conclusion=conclusion, notes=notes,
+        grud_pr_auc=g_pr,
+        lgbm_pr_auc=l_pr,
+        pr_auc_diff=pr_diff,
+        grud_brier=g_br,
+        lgbm_brier=l_br,
+        brier_diff=br_diff,
+        grud_roc_auc=g_auc,
+        lgbm_roc_auc=l_auc,
+        auc_diff=roc_diff,
+        p_value_debacka=p_val,
+        is_not_worse=is_not_worse,
+        conclusion=conclusion,
+        notes=notes,
+        primary_metric="pr_auc",
     )
 
 
@@ -771,12 +814,20 @@ def run_mock(limit: int = 50) -> D3Report:
         n_test=0, n_train=0,
     )
     comp = PairedComparison(
+        grud_pr_auc=g_m.get("pr_auc", float("nan")),
+        lgbm_pr_auc=l_m.get("pr_auc", float("nan")),
+        pr_auc_diff=g_m.get("pr_auc", 0) - l_m.get("pr_auc", 0),
+        grud_brier=g_m.get("brier", float("nan")),
+        lgbm_brier=l_m.get("brier", float("nan")),
+        brier_diff=g_m.get("brier", 0) - l_m.get("brier", 0),
         grud_roc_auc=g_m.get("roc_auc", float("nan")),
         lgbm_roc_auc=l_m.get("roc_auc", float("nan")),
         auc_diff=g_m.get("roc_auc", 0) - l_m.get("roc_auc", 0),
-        p_value_debacka=None, is_not_worse=True,
+        p_value_debacka=None,
+        is_not_worse=True,
         conclusion="Mock 模式：无真实配对比较，仅验证管线连通性",
-        notes=["Mock 数据：GRU-D AUC 模拟略高于 LGBM"],
+        notes=["Mock 数据：主指标应为 PR-AUC/Brier；ROC 仅对照"],
+        primary_metric="pr_auc",
     )
     t0 = time.time()
     report = D3Report(profile, grud, lgbm_res, comp, elapsed_s=time.time() - t0,
@@ -859,12 +910,12 @@ def _print_summary(report: D3Report) -> None:
         bar = "█" * int(r * 20) + "░" * (20 - int(r * 20))
         print(f"    {f:12s}  {bar}  {r:.1%}")
     print()
-    print(f"  GRU-D test ROC-AUC：  {c.grud_roc_auc:.4f}  (n={report.grud.n_test})")
-    print(f"  LGBM  test ROC-AUC：  {c.lgbm_roc_auc:.4f}  (n={report.lgbm.n_test})")
-    print(f"  差异（GRU − LGBM）：  {c.auc_diff:+.4f}")
-    print(f"  DeLong p 值：         {c.p_value_debacka}")
+    print(f"  【主】GRU-D PR-AUC：   {c.grud_pr_auc:.4f}  |  Brier：{c.grud_brier:.4f}")
+    print(f"  【主】LGBM  PR-AUC：   {c.lgbm_pr_auc:.4f}  |  Brier：{c.lgbm_brier:.4f}")
+    print(f"  PR-AUC 差（GRU−LGBM）：{c.pr_auc_diff:+.4f}")
+    print(f"  （对照）ROC-AUC：      GRU={c.grud_roc_auc:.4f}  LGBM={c.lgbm_roc_auc:.4f}  DeLong p={c.p_value_debacka}")
     print()
-    print(f"  D3 验收结论：{'✅ 通过' if c.is_not_worse else '⚠️ 未通过'} — {c.conclusion}")
+    print(f"  D3 验收（主：PR-AUC）：{'✅ 通过' if c.is_not_worse else '⚠️ 未通过'} — {c.conclusion}")
     print("=" * 60)
     print(f"  报告已保存至：{_D3_ARTIFACTS}")
 

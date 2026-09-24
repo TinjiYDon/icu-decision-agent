@@ -145,8 +145,12 @@ class D3Report:
 
 | 场景 | 结论 | D3 是否通过 |
 |------|------|------------|
-| GRU-D AUC > LGBM AUC，且 p < 0.05 | 时序信息确实有价值 | ✅ |
-| GRU-D AUC ≈ LGBM AUC，p ≥ 0.05 | 时序信息无增量（负结果） | ✅ |
+| GRU-D **PR-AUC** ≥ LGBM，或差在容差内 | 时序有价值 / 无显著劣 | ✅ |
+| GRU-D **PR-AUC** 明显低于 LGBM（超容差） | 需排查 | ❌ |
+| **Brier** | 辅证写入报告 | 不单独否决（写 STATUS） |
+| **ROC-AUC** / DeLong | **仅对照** | 不作为唯一过线条件 |
+
+> 2026-09-24 纠偏：主指标对齐 SOTA H2（PR-AUC/Brier），废除「仅 ROC 不劣」卖点。
 | GRU-D AUC < LGBM AUC，p < 0.05 | 时序信息有害（需排查） | ⚠️ 需报告 |
 | keepable 比例 < 10% | 数据不足，无法得出结论 | ⚠️ 需报告 |
 

@@ -49,9 +49,17 @@
 
 | ID | 假设 | 相对谁 | 改什么 | 验收指标 |
 |----|------|--------|--------|----------|
-| **H1** | 精确死亡时间标签（deathtime v2）优于日期级 `dod` 的决策校准叙事 | 常用 MIMIC `dod` 标签管线 | 标签定义 + 重训 | 固定工作点下 Brier / 净受益；**不以刷高 PR-AUC 退回 dod** |
-| **H2** | 同 stay-split 下，GRU-D 与 LGBM 双轨对照可量化「表格 vs 时序」增益边界 | 仅报单一模型 AUC 的工作 | 同 split + 稀疏门控 + `compare_dual_track` | test **PR-AUC / Brier** 并列表；ROC 仅对照 |
-| **H3** | SHAP→RAG→LLM + HITL 比「仅 SHAP 条形图」提高可审计人机协同 | 纯 SHAP 可视化 Demo | 引用校验、采纳/驳回日志、care_plan | 周 **采纳率**、降级率、引用 valid 比例（见飞轮 KPI） |
+| **H1** | 精确死亡时间标签（deathtime v2）+ **DCA/净受益** 优于「只刷 ROC/旧 dod」叙事 | 常用 `dod` + 单报 AUC | 标签 v2 + DCA 工作点 | Brier / **决策曲线**；不以刷高 PR-AUC 退回 dod |
+| **H2** | **公平双轨协议**下可量化表格 vs 时序边界 | 随意比两个 AUC | 同 h / split / stay 对齐 + 稀疏门控 | test **PR-AUC / Brier** 主表；ROC 仅对照 |
+| **H3** | SHAP→RAG→LLM **解释可信工程** + HITL 优于「仅 SHAP 条」 | 纯可视化 Demo | 分段容差、RAG18、详解 Prompt、audit | 引用 valid 率 + 周 **采纳率**（飞轮） |
+
+### 已采入工程落点（2026-09-24）
+
+| 假设 | 代码/文档落点 | 备注 |
+|------|----------------|------|
+| H1 | `domain/models/dca.py` · `scripts/d2_dca_full.py` | DX-2 已合 |
+| H2 | `scripts/d3_grud_minimal_compare.py` | DX-3；**禁止**仅用 ROC 过线 |
+| H3 | `reference_validator` / `rag_retriever` / `prompts` / `quality_eval` | DX-1 供给侧；KPI 待闭合 |
 
 ---
 

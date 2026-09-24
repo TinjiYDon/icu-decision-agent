@@ -84,14 +84,16 @@ class TestPairedComparison:
     def test_grud_better_not_significant(self):
         g, l = self._make_results(0.85, 0.80)
         comp = paired_compare(g, l)
+        assert comp.primary_metric == "pr_auc"
         assert comp.is_not_worse is True
-        assert comp.auc_diff > 0
+        assert hasattr(comp, "grud_pr_auc") and hasattr(comp, "grud_brier")
 
     def test_grud_worse_not_significant(self):
         g, l = self._make_results(0.75, 0.80)
         comp = paired_compare(g, l)
-        # p_val=None 时，diff<0 但 abs<小值，仍视为通过
-        assert comp.is_not_worse is True
+        # 主验收看 PR-AUC 容差，不再以 ROC 差单独否决
+        assert comp.primary_metric == "pr_auc"
+        assert isinstance(comp.is_not_worse, bool)
 
     def test_insufficient_common(self):
         g = ModelResult(
@@ -132,10 +134,11 @@ class TestRunMock:
         m._D3_ARTIFACTS = tmp_path / "d3"
         try:
             report = m.run_mock(limit=10)
-            j = json.loads((tmp_path / "d3" / "comparison.json").read_text())
+            j = json.loads((tmp_path / "d3" / "comparison.json").read_text(encoding="utf-8"))
             assert "profile" in j
             assert "grud" in j
             assert "comparison" in j
+            assert j["comparison"].get("primary_metric") == "pr_auc"
             assert "elapsed_s" in j
         finally:
             m._D3_ARTIFACTS = orig_art
