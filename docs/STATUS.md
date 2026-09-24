@@ -1,8 +1,9 @@
 # 项目状态
 
-> 更新：2026-09-14 · **独立 CDSS 深挖** · 标签 v2（deathtime）· 主指标 PR-AUC / Brier  
-> **演示台**：总览 / 监测 / **解释（PR#9）** / **解释安全（D1）** / 方法 / 调参 / 验收  
-> **叙事**：AIGC 人机协同决策 + 仓内规划建议；**不**耦合 scheduling 床位引擎
+> 更新：2026-09-24 · **独立 CDSS 深挖** · 标签 v2（deathtime）· 主指标 PR-AUC / Brier  
+> **演示台**：总览 / 监测 / 解释 / 方法 / 调参 / 验收（含 DCA）  
+> **叙事**：AIGC 人机协同决策 + 仓内规划建议；**不**耦合 scheduling 床位引擎  
+> **组员包**：PR [#18](https://github.com/TinjiYDon/icu-decision-agent/pull/18) 已合 · 方向见 [TEAM_DIRECTION.md](TEAM_DIRECTION.md)
 
 ## 定位
 

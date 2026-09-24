@@ -1,8 +1,9 @@
 # Roadmap · icu-decision-agent
 
-> 更新：2026-09-13  
+> 更新：2026-09-24  
 > 人读：本仓独立出成果——AIGC 人机协同 CDSS；不与 scheduling 硬耦合。  
-> AI：P0 先于 P1；非目标勿实现、勿在 STATUS 宣称。
+> AI：P0 先于 P1；非目标勿实现、勿在 STATUS 宣称。  
+> **2026-09-24**：组员包 PR#18 已合（解释工程化 / DCA / GRU-D 对照）；编号见 [TEAM_DIRECTION.md](TEAM_DIRECTION.md)。
 
 ## Agent 上下文
 
@@ -28,10 +29,12 @@ independent: zero hard couple to icu-scheduling-agent
 | 波次 | 项 | 说明 |
 |------|----|------|
 | **D-LIT** | 文献/市面对标 | [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
-| D0 | PR#11 GRU-D / 热力图 | **已合 main**；label v2 dump 文档对齐 |
-| D1 | 真序列 + 双轨对照 | Layer0→序列 ETL；同 split；主报 PR-AUC/Brier |
-| D2 | AIGC 人机闭环 | 采纳/驳回/编辑 + audit log |
-| D3 | 仓内 care_plan | 结构化处置建议（非床位） |
+| D0 | PR#11 GRU-D / 热力图 | **已合** |
+| D1′ | 解释工程化（组员称 D1） | **已合 PR#18** · 引用容差 / RAG18 / Prompt |
+| D2′ | DCA + 工作点 CI（组员称 D2） | **已合 PR#18** |
+| D3′ | GRU-D 公平双轨（组员称 D3） | **已合 PR#18** · 同 h=6/split |
+| D2 | AIGC 人机闭环 KPI | 骨架已有；补周采纳率 |
+| D3 | 仓内 care_plan 打磨 | 骨架已有（PR#14） |
 | **D-FLY** | 数据飞轮 | [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · HITL 汇总 KPI |
 ## 非目标
 
