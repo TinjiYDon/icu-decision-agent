@@ -5,14 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 import streamlit as st
-from sqlalchemy import text
 
 from application.predict_patient import predict_patient_with_explanation
+from application.ui_queries import list_all_stay_ids, list_hours_for_stay
 from domain.explain.config import get_config
 from domain.explain.rag_retriever import is_available as rag_is_available
 from domain.features.build import prediction_hours
 from infra.config import get_settings
-from infra.db import get_engine
 from presentation.ui.charts import fig_shap_bars
 from presentation.ui.theme import apply_theme, risk_badge_html, disclaimer
 
@@ -183,16 +182,7 @@ _CSS = """
 
 
 def _hours_for_stay(stay_id: int) -> list[int]:
-    engine = get_engine()
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                "SELECT hour_index FROM feat.sample_matrix "
-                "WHERE stay_id = :sid ORDER BY hour_index"
-            ),
-            {"sid": int(stay_id)},
-        ).fetchall()
-    return [int(r[0]) for r in rows]
+    return list_hours_for_stay(int(stay_id))
 
 
 def _kb_chunk_count() -> int:
@@ -228,16 +218,7 @@ def render_explain() -> None:
     # ── 侧栏：患者选择 + 系统状态 ─────────────────────────────
     with st.sidebar:
         st.markdown("### 患者选择")
-        engine = get_engine()
-        with engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    "SELECT DISTINCT f.stay_id "
-                    "FROM feat.sample_matrix f "
-                    "ORDER BY f.stay_id LIMIT 500"
-                )
-            ).mappings().all()
-        stays = [int(r["stay_id"]) for r in rows]
+        stays = list_all_stay_ids(500)
         if not stays:
             st.warning("数据库无 stay 记录")
             st.stop()
