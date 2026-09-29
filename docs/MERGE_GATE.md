@@ -37,4 +37,6 @@
 
 ## 下一拍（产出闭合）
 
-见各仓 [INTEGRATION_PREP.md](INTEGRATION_PREP.md)：dump 真跑 → STATUS 填 PR-AUC/Brier 与 MOO 表 → HITL KPI / S2-TRAJ。
+- scheduling：MOO 阶段 5 Streamlit（见对仓 ROADMAP）  
+- decision：HITL KPI → STATUS；可选 dump 同步  
+- 合入检查：[OR_MERGE_CHECK](https://github.com/TinjiYDon/icu-scheduling-agent/blob/main/docs/OR_MERGE_CHECK_20260929.md)（scheduling 仓）· 两仓 open PR=0  
