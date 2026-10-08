@@ -167,13 +167,13 @@ def predict_grud(stay_id: int) -> dict:
         for f in attr["top_features"]
     ]
 
-    # Time labels: pad_truncate prepends (max_t - n_steps) zero rows, so real
-    # observations (hours 0..lookback) live at the END of the sequence. Label
-    # padded columns as "pad" and real columns with actual hour offsets.
+    # Time labels: pad_truncate RIGHT-pads (appends (max_t - n_steps) rows at
+    # the end), so real observations (hours 0..lookback) live at the FRONT.
+    # Label real columns with their hour offset and trailing filler as "pad".
     n_total = seq["x"].shape[0]
-    pad_len = max(n_total - int(LOOKBACK_HOURS * 2), 0)
-    time_labels = [f"pad({i - pad_len}h)" for i in range(pad_len)] + [
-        f"{(i - pad_len) * 0.5:.1f}h" for i in range(pad_len, n_total)
+    n_real = min(int(LOOKBACK_HOURS * 2), n_total)
+    time_labels = [f"{i * 0.5:.1f}h" for i in range(n_real)] + [
+        "pad" for _ in range(n_total - n_real)
     ]
 
     recommend = recommend_action(prob, score_kind="probability")
