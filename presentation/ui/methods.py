@@ -94,18 +94,18 @@ def render_methods() -> None:
 
     st.header("4. 模型与损失函数")
     st.markdown(
-        "采用 **LightGBM** 梯度提升树做二分类概率估计。"
+        "**底座（默认推理）**：LightGBM 二分类概率。"
+        "这是可复现骨干，**不是**创新点。"
         "默认超参：`n_estimators=64`，`max_depth=4`，`learning_rate=0.1`；"
-        "并以 `scale_pos_weight = N_{neg}/N_{pos}` 处理类别不平衡。"
+        "`scale_pos_weight = N_{neg}/N_{pos}`。"
     )
     st.markdown("**二元交叉熵（logistic loss）**")
     st.latex(r"p=\sigma(z)=\frac{1}{1+e^{-z}}")
     st.latex(r"\mathcal{L}(y,p)=-\big[y\log p+(1-y)\log(1-p)\big]")
-    st.latex(r"\mathcal{L}_{\mathrm{batch}}=\frac{1}{N}\sum_{i=1}^{N}\mathcal{L}(y_i,p_i)")
     st.markdown(
-        "**设计要点**：输出为可校准概率，便于映射观察 / 复查 / 加强监护等临床档位；"
-        "在阳性率约 2% 的设定下，主评价指标采用 **PR-AUC** 与 **Brier score**，"
-        "ROC-AUC 仅作对照。工作点阈值在验证集按 F1 选定后固定到测试集。"
+        "**切口**：阳性稀有时主报 **PR-AUC / Brier**；ROC 仅对照。"
+        "时序加深走 **GRU-D 公平双轨**（同 stay / 同 split），见导航「创新」页，"
+        "不要把 GRU-D 说成已经替换默认床旁模型。"
     )
 
     st.header("5. 可解释性")

@@ -28,4 +28,4 @@ open PR = **0**；#12/#15–17 chore 已关；无需再 merge。
 
 ## 下一拍
 
-HITL KPI 写入 STATUS；可选 dump 同步；演示挂 DCA 口述。
+HITL KPI 仍 empty（需演示台攒反馈）；D3 labs-only 真数已写入 STATUS；有 chartevents 后再开 vital 门控。

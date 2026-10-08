@@ -39,7 +39,7 @@
 | 轴 | 文献/市面常见做法 | 本仓 | 差距 | 拟切口 |
 |----|-------------------|------|------|--------|
 | 表格预警 | LGBM/XGB + 精细标签 + 外部验证 | LGBM S2 + deathtime v2；单 MIMIC split | 缺时间外推/多中心 | 工作点协议 + 决策曲线 |
-| 不规则时序 | GRU-D / TFT 全量训练报告 | GRU-D 已通链路；稀疏序列仍痛 | 真序列覆盖与指标未稳 | 同 split 对照 + 稀疏门控 |
+| 不规则时序 | GRU-D / TFT 全量训练报告 | GRU-D 已通链路；**TFT-lite** 为同张量注意力消融（非 Lim 全文） | 真序列覆盖与指标未稳 | 同 split 对照 + 稀疏门控 |
 | 可解释 CDSS | SHAP 图或注意热力 | SHAP→RAG→LLM + 引用校验 | 市面少见「可追溯引用+降级」闭环 | HITL + 引用有效性 |
 | 人机协同 | 报警抑制、确认流程 | HITL audit + care_plan | 反馈未系统回流改进 | 数据飞轮（见 DATA_FLYWHEEL） |
 
@@ -59,6 +59,7 @@
 |------|----------------|------|
 | H1 | `domain/models/dca.py` · `scripts/d2_dca_full.py` | DX-2 已合 |
 | H2 | `scripts/d3_grud_minimal_compare.py` | DX-3；**禁止**仅用 ROC 过线 |
+| TFT-lite | `domain/models/temporal/tft_lite.py` · 烟测 `tft_smoke.py` | **消融**；禁止说已替换 LGBM |
 | H3 | `reference_validator` / `rag_retriever` / `prompts` / `quality_eval` | DX-1 供给侧；KPI 待闭合 |
 
 ---

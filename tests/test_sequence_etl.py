@@ -20,3 +20,14 @@ def test_passes_sparse_gate_accepts_vitals():
     assert passes_sparse_gate(m, feature_names_list=[
         "hr", "sbp", "lactate", "creatinine", "resp_rate", "temperature", "spo2", "bun"
     ]) is True
+
+
+def test_passes_sparse_gate_labs_only_without_vitals():
+    m = np.zeros((12, 8), dtype=np.float64)
+    # lactate / creatinine / bun only
+    m[:6, 2] = 1.0
+    m[:6, 3] = 1.0
+    m[:4, 7] = 1.0
+    names = ["hr", "sbp", "lactate", "creatinine", "resp_rate", "temperature", "spo2", "bun"]
+    assert passes_sparse_gate(m, feature_names_list=names, require_any_vital=True) is False
+    assert passes_sparse_gate(m, feature_names_list=names, require_any_vital=False) is True

@@ -22,7 +22,11 @@
    - 校准曲线 + **决策净受益**曲线（测试集抽样 ≤5k）。  
    - 强调：稀有阳性优先 PR-AUC，勿单报 ROC。
 
-4. **收尾**（可选 30s）  
+4. **创新**（约 45s）  
+   - 底座 LightGBM vs 切口 H1–H3；TFT-lite 只是对照消融。  
+   - 有 `artifacts/d3/report.md` 则指 PR-AUC 主表。
+
+5. **收尾**（可选 30s）  
    - MCP：`predict_risk(stay_id, hour_index=None)`；调参页可改建议阈值。
 
 ## 一键启动

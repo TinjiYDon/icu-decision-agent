@@ -164,11 +164,14 @@ def profile_nonnull_rates(
     min_observed_cells: int = 3,
     min_obs_ratio: float = 0.05,
     limit: int = 0,
+    *,
+    require_any_vital: bool = True,
 ) -> SequenceProfile:
     """查询 MIMIC-IV，刻画 6h 窗口内每个特征的观测非空率。
 
     Args:
         limit: 最大处理的 stay 数（0 = 全库）。
+        require_any_vital: False 时允许仅化验序列过门（dump 缺 vitals 时用）。
     返回 SequenceProfile（不可变），含 keepable_stay_ids 列表。
     """
     from infra.db import get_engine
@@ -263,16 +266,20 @@ def profile_nonnull_rates(
 
             # 稀疏门控判定
             mask = np.array(nonnull_list, dtype=np.float64).reshape(1, -1)
-            if not passes_sparse_gate(mask, feature_names_list=FEATURE_NAMES):
-                # 细分 drop 原因
+            if not passes_sparse_gate(
+                mask,
+                feature_names_list=FEATURE_NAMES,
+                require_any_vital=require_any_vital,
+            ):
+                # 细分 drop 原因（互斥优先）
+                vital_keys = {"hr", "sbp", "spo2", "resp_rate", "temperature"}
+                has_vital = any(counts[k] > 0 for k in vital_keys)
                 if n_nonnull < min_observed_cells:
                     drop_reasons["sparse_cells"] += 1
+                elif require_any_vital and not has_vital:
+                    drop_reasons["no_vital"] += 1
                 else:
                     drop_reasons["sparse_ratio"] += 1
-                # 无 vital 检查
-                vital_keys = {"hr", "sbp", "spo2", "resp_rate", "temperature"}
-                if not any(counts[k] > 0 for k in vital_keys):
-                    drop_reasons["no_vital"] += 1
                 continue
             keepable_ids.append(sid)
 
@@ -306,6 +313,8 @@ def train_and_predict_grud(
     keepable_stay_ids: list[int],
     lookback_hours: int = 6,
     assignment: dict[int, str] | None = None,
+    *,
+    require_any_vital: bool = True,
 ) -> ModelResult:
     """在 keepable_stay_ids 子集上训练 GRU-D，返回 ModelResult。
     assignment：来自 LGBM manifest 的统一 split，确保两模型 split 一致。
@@ -405,7 +414,11 @@ def train_and_predict_grud(
                         if cands: ux[t_idx, fi] = cands[-1][1]
                 m = (~np.isnan(ux)).astype(np.float64)
                 x_ff, m_out, d_out = build_mask_delta(ux, uniform_times)
-                if not passes_sparse_gate(m_out, feature_names_list=FEATURE_NAMES):
+                if not passes_sparse_gate(
+                    m_out,
+                    feature_names_list=FEATURE_NAMES,
+                    require_any_vital=require_any_vital,
+                ):
                     continue
                 seqs.append({"x": x_ff, "m": m_out, "delta": d_out})
                 labels.append(lmap.get(sid, 0))
@@ -638,6 +651,20 @@ def paired_compare(
         HAS_DEBACKA = False
 
     def _empty(**kwargs) -> PairedComparison:
+        def _num(v: object) -> float:
+            try:
+                x = float(v)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return float("nan")
+            return x
+
+        g_roc = _num(grud.roc_auc)
+        l_roc = _num(lgbm.roc_auc)
+        auc_diff = (
+            g_roc - l_roc
+            if (g_roc == g_roc and l_roc == l_roc)
+            else 0.0
+        )
         base = dict(
             grud_pr_auc=float("nan"),
             lgbm_pr_auc=float("nan"),
@@ -645,11 +672,9 @@ def paired_compare(
             grud_brier=float("nan"),
             lgbm_brier=float("nan"),
             brier_diff=0.0,
-            grud_roc_auc=grud.roc_auc,
-            lgbm_roc_auc=lgbm.roc_auc,
-            auc_diff=(grud.roc_auc - lgbm.roc_auc)
-            if (grud.roc_auc == grud.roc_auc and lgbm.roc_auc == lgbm.roc_auc)
-            else 0.0,
+            grud_roc_auc=g_roc,
+            lgbm_roc_auc=l_roc,
+            auc_diff=auc_diff,
             p_value_debacka=None,
             is_not_worse=True,
             notes=[],
@@ -843,21 +868,24 @@ def run(
     lookback_hours: int = 6,
     mock: bool = False,
     limit: int = 5000,
+    *,
+    labs_only: bool = False,
 ) -> D3Report:
     t0 = time.time()
+    require_vital = not labs_only
     if mock:
         print(f"  [D3] mock 模式，limit={limit}")
         report = run_mock(limit)
     else:
-        print(f"  [D3] 真实模式，lookback={lookback_hours}h, limit={limit}")
-        # 1. 非空率刻画（limit 控制采样规模）
-        profile = profile_nonnull_rates(lookback_hours, limit=limit)
+        mode = "labs-only（不要求 vitals）" if labs_only else "默认（要求至少一项 vital）"
+        print(f"  [D3] 真实模式，lookback={lookback_hours}h, limit={limit}, gate={mode}")
+        profile = profile_nonnull_rates(
+            lookback_hours, limit=limit, require_any_vital=require_vital
+        )
         if profile.n_keepable < 20:
             raise RuntimeError(f"可训子集过小：{profile.n_keepable}，无法进行 D3 对照")
-        # 2. 求与 sample_matrix 的交集（LGBM 需要聚合特征表）
         from sqlalchemy import text
         app_eng = get_engine()
-        # 分批查询避免 PostgreSQL $N 参数上限
         BATCH = 500
         common_ids = []
         for bs in range(0, len(profile.keepable_stay_ids), BATCH):
@@ -869,23 +897,35 @@ def run(
                     f" JOIN label.mortality_12h l ON sm.stay_id = l.stay_id AND sm.hour_index = l.hour_index"
                     f" WHERE sm.stay_id IN ({sids_str})")).mappings().all()
             common_ids.extend(int(r["stay_id"]) for r in rows)
-        common_ids = list(dict.fromkeys(common_ids))  # 去重保序
+        common_ids = list(dict.fromkeys(common_ids))
         print(f"  [D3] keepable={profile.n_keepable:,}, sample_matrix共同={len(common_ids):,} ({len(common_ids)/max(profile.n_keepable,1):.1%})")
         if len(common_ids) < 50:
             raise RuntimeError(f"GRU-D 与 LGBM 共同子集过小：{len(common_ids)}，无法进行对照")
         n_use = min(len(common_ids), limit)
         use_ids = common_ids[:n_use]
         print(f"  [D3] 使用 {n_use} 条共同 stay 进行对照")
-        # 3. 加载统一 split（来自 LGBM manifest，两模型共享）
         from domain.models.split import load_split_assignment
         unified_assignment = load_split_assignment()
         if unified_assignment is None:
             print("  [D3] WARNING: 无 LGBM split manifest，使用随机划分")
-        # 4. GRU-D 训练 + LGBM 预测（使用同一 split，都在 h=6 比较）
-        grud = train_and_predict_grud(use_ids, lookback_hours, assignment=unified_assignment)
+        grud = train_and_predict_grud(
+            use_ids,
+            lookback_hours,
+            assignment=unified_assignment,
+            require_any_vital=require_vital,
+        )
         lgbm = predict_lgbm_on_subset(use_ids, assignment=unified_assignment, hour_index=lookback_hours)
-        # 5. 配对比较（在共同 test set 上）
         comparison = paired_compare(grud, lgbm)
+        if labs_only:
+            from dataclasses import replace
+
+            comparison = replace(
+                comparison,
+                notes=list(comparison.notes)
+                + [
+                    "labs-only gate：dump/Layer0 缺 chart vitals 时用化验序列过门；非默认床旁配置"
+                ],
+            )
         report = D3Report(profile, grud, lgbm, comparison, elapsed_s=time.time() - t0,
                           artifact_path=_D3_ARTIFACTS / "comparison.json")
     _save_report(report)
@@ -925,13 +965,22 @@ def main() -> None:
     parser.add_argument("--lookback", type=int, default=6, help="回溯窗口小时数（默认 6）")
     parser.add_argument("--limit", type=int, default=200, help="限制处理的 stay 数（默认 200）")
     parser.add_argument("--mock", action="store_true", help="使用 mock 数据，无需数据库（仅测试用）")
+    parser.add_argument(
+        "--labs-only",
+        action="store_true",
+        help="稀疏门控不要求 vitals（适用于 dump 缺心率/血压时的化验序列对照）",
+    )
     args = parser.parse_args()
     if args.mock:
         print("⚠️  mock 模式：仅验证管线连通性，不使用真实数据库")
     else:
         print("✓  真实模式：连接 MIMIC-IV 数据库，刻画序列非空率并对照 LGBM")
-    report = run(lookback_hours=args.lookback, mock=args.mock, limit=args.limit)
-    # 返回码：is_not_worse → 0，否则 → 1
+    report = run(
+        lookback_hours=args.lookback,
+        mock=args.mock,
+        limit=args.limit,
+        labs_only=args.labs_only,
+    )
     raise SystemExit(0 if report.comparison.is_not_worse else 1)
 
 
