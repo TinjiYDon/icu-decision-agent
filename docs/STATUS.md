@@ -49,7 +49,7 @@ ICU **实时早期恶化预警 + AIGC 人机协同 CDSS**：预测时刻 `t=inti
 | D3 GRU-D 真序列最小对照 | ✅ 协议已落地（主表 **PR-AUC / Brier**）· labs-only 真跑（limit=400）：GRU PR-AUC **0.046** vs LGBM **0.053**（差 -0.007，容差内通过）· 报告 `artifacts/d3/report.md` · vitals 非空率 0（dump 口径） |
 | TFT-lite | ✅ 同 (x,m,δ) 注意力消融 · `python scripts/d3_tft_lite_smoke.py` · **非**默认模型 |
 | D3 真库试跑 | ✅ `--labs-only` 通路；缺 chartevents 时不宣称「完整监护时序增益」 |
-| 化验时序深化 | ✅ 10 项化验 · 阳/阴混合抽样 + **分层 split** · LGBM / GRU-D / TFT-lite · n=532 · test 正例 15 · **PR-AUC**：LGBM **0.471** · GRU-D **0.502**（+0.031）· TFT-lite **0.451**（−0.020）· Brier：LGBM 0.242 / GRU 0.223 / TFT 0.199 · `artifacts/d3/lab_triple_compare.md` · **非**自然患病率（混合抽样）· 默认床旁仍 LGBM |
+| 化验时序深化 | ✅ 10 项化验 · 阳/阴混合抽样 + **分层 split** · LGBM / GRU-D / TFT-lite · **因果窗** `charttime < intime+h`（h 与 label 同行）· 旧数字（LGBM 0.471 / GRU 0.502 / TFT 0.451）为 lookback 越界泄漏版，**勿外推** · 合入后需重跑 `d3_lab_triple_compare` 再填主表 · **非**自然患病率 · 默认床旁仍 LGBM |
 | HITL / care_plan | ✅ 解释页反馈 audit · Streamlit「规划」页 · 非床位调度 |
 | SOTA 对标 | ✅ [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
 | 数据飞轮 | ✅ [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `python -m application.summarize_hitl` |

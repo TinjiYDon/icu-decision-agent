@@ -11,11 +11,25 @@ from domain.models.temporal.lab_temporal import run_lab_triple_compare
 def main() -> None:
     p = argparse.ArgumentParser(description="Lab temporal triple compare")
     p.add_argument("--limit", type=int, default=600)
-    p.add_argument("--lookback", type=int, default=12)
+    p.add_argument(
+        "--hour-index",
+        type=int,
+        default=6,
+        help="prediction hour h; labs strictly before intime+h (label row hour_index)",
+    )
+    p.add_argument(
+        "--lookback",
+        type=int,
+        default=12,
+        help="hours before prediction to include; cannot extend past hour-index",
+    )
     p.add_argument("--epochs", type=int, default=25)
     args = p.parse_args()
     payload = run_lab_triple_compare(
-        limit=args.limit, lookback_hours=args.lookback, epochs=args.epochs
+        limit=args.limit,
+        hour_index=args.hour_index,
+        lookback_hours=args.lookback,
+        epochs=args.epochs,
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
