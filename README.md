@@ -2,6 +2,8 @@
 
 独立开源项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
 
+**总纲领（先读）**：[`docs/MASTER_NARRATIVE.md`](docs/MASTER_NARRATIVE.md) — 总目标与总内容如何串成一条线  
+
 **协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始

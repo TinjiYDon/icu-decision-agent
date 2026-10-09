@@ -52,15 +52,19 @@
 | **H1** | 精确死亡时间标签（deathtime v2）+ **DCA/净受益** 优于「只刷 ROC/旧 dod」叙事 | 常用 `dod` + 单报 AUC | 标签 v2 + DCA 工作点 | Brier / **决策曲线**；不以刷高 PR-AUC 退回 dod |
 | **H2** | **公平双轨协议**下可量化表格 vs 时序边界 | 随意比两个 AUC | 同 h / split / stay 对齐 + 稀疏门控 | test **PR-AUC / Brier** 主表；ROC 仅对照 |
 | **H3** | SHAP→RAG→LLM **解释可信工程** + HITL 优于「仅 SHAP 条」 | 纯可视化 Demo | 分段容差、RAG18、详解 Prompt、audit | 引用 valid 率 + 周 **采纳率**（飞轮） |
+| **H4** | **效用校准工作点（UCEW）**：val 上 max NB（临床窗+报警率帽）优于 max F1 | 先 F1 再事后 DCA | `select_threshold_by_net_benefit` | test **ΔNB**、报警率帽内；PR-AUC 不变 |
+| **H5** | **稀疏门控多时刻融合（SGDF）** | 单时刻 / 无门控平均 | 完备度门控当前时刻 vs 多时刻轨迹 | PR-AUC 容差 / Brier·NB；稀疏子集可解释 |
 
-### 已采入工程落点（2026-09-24）
+### 已采入工程落点（2026-10-09）
 
 | 假设 | 代码/文档落点 | 备注 |
 |------|----------------|------|
 | H1 | `domain/models/dca.py` · `scripts/d2_dca_full.py` | DX-2 已合 |
 | H2 | `scripts/d3_grud_minimal_compare.py` | DX-3；**禁止**仅用 ROC 过线 |
 | TFT-lite | `domain/models/temporal/tft_lite.py` · 烟测 `tft_smoke.py` | **消融**；禁止说已替换 LGBM |
-| H3 | `reference_validator` / `rag_retriever` / `prompts` / `quality_eval` | DX-1 供给侧；KPI 待闭合 |
+| H3 | `reference_validator` / `rag_retriever` / `prompts` / `quality_eval` | DX-1 供给侧 |
+| H4 | `domain/models/utility_calibrate.py` · `scripts/h4_utility_compare.py` | 旧 S2 真跑见 `artifacts/h4/` |
+| H5 | `domain/models/sparsity_fusion.py` · `scripts/h5_sparsity_fusion.py` | 无 Layer0：多时刻 LGBM 轨迹代理 |
 
 ---
 

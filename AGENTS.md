@@ -5,7 +5,8 @@
 
 ## 一句话
 
-MIMIC stay → 特征/标签 → LightGBM 12h 风险 → SHAP+RAG+LLM → 人机确认 → 仓内处置规划建议 → Streamlit。
+**总目标**：可决策的早期预警 CDSS（效用可校准 · 融合可证伪 · 解释可人审）。  
+流水线：MIMIC stay → 特征/标签 → LightGBM → **H4 效用阈值** → **H5 稀疏融合** → SHAP+RAG+LLM → HITL → Streamlit。
 
 ## 角色
 
@@ -17,13 +18,11 @@ MIMIC stay → 特征/标签 → LightGBM 12h 风险 → SHAP+RAG+LLM → 人机
 
 ## 先读
 
-1. `docs/ROADMAP.md`（Wave D-LIT / D0–D3 / D-FLY）
-2. `docs/SOTA_SURVEY.md`（**先对标再创新**；无 LIT 不宣称 SOTA）
-3. `docs/DATA_FLYWHEEL.md`
-4. `docs/ROADMAP_EXEC.md`
-5. `docs/PARAM_STORY.md`
-6. `docs/STATUS.md`
-7. `docs/DUMP_READY.md` · `docs/TUNING_LOCAL.md`
+1. **`docs/MASTER_NARRATIVE.md`（总目标 + 总内容串线 · SSOT）**
+2. `docs/ACADEMIC_THESIS.md` · `docs/TEACHER_INNOVATION.md`
+3. `docs/STATUS.md` · `docs/ROADMAP.md`
+4. `docs/SOTA_SURVEY.md`（先对标再创新；无 LIT 不宣称 SOTA）
+5. `docs/DUMP_READY.md` · `docs/DEMO_SCRIPT.md`
 
 ## 命令
 

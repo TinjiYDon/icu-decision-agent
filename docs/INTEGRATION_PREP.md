@@ -1,6 +1,6 @@
 # 代码整合与完善准备清单 · decision
 
-> 2026-09-24 · Owner：`TinjiYDon` · 前置：创新点已采入 ROADMAP/SOTA
+> 更新：2026-10-09 · Owner：`TinjiYDon` · 前置：创新点已采入 ROADMAP/SOTA
 
 ## 已就绪（勿重复造）
 
@@ -22,11 +22,11 @@
 
 | ID | 项 | 状态 |
 |----|----|------|
-| C1 | D3 `paired_compare` 主验收改 PR-AUC/Brier | 本批落地 |
-| C2 | 测试读 JSON `encoding=utf-8` | 本批落地 |
-| C3 | STATUS 正式对照表填 PR-AUC/Brier（需真跑数字） | 待本机 dump |
-| C4 | HITL KPI 写入 STATUS | 待跑飞轮 |
-| C5 | Demo 脚本挂 DCA 口述 | 文档小改可后置 |
+| C1 | D3 `paired_compare` 主验收改 PR-AUC/Brier | ✅ 已在 `scripts/d3_grud_minimal_compare.py` |
+| C2 | 测试读 JSON `encoding=utf-8` | ✅ `tests/test_d3_grud_compare.py` |
+| C3 | STATUS 正式对照表填 PR-AUC/Brier（需真跑数字） | 🟡 旧 S2 已 restore+重训+DCA（PR-AUC 0.139）；v2 与因果窗三方仍待 Layer0/`mimic` |
+| C4 | HITL KPI 写入 STATUS | ✅ 演示种子 12 条（非临床周报） |
+| C5 | Demo 脚本挂 DCA 口述 | ✅ [DEMO_SCRIPT.md](DEMO_SCRIPT.md) 第 3 节 |
 
 ## 禁区
 

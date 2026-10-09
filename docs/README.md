@@ -1,12 +1,17 @@
 # 文档索引
 
+> **先读总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（总目标 + 总内容串线）
+
 | 文档 | 内容 |
 |------|------|
+| [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / 闭环叙事（SSOT）** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
 | [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
 | [STATUS.md](STATUS.md) | 当前进度与指标 |
+| [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) | **痛点/约束/H1–H5 学术纲领** |
+| [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | 老师答辩口径 |
 | [TEAM_DIRECTION.md](TEAM_DIRECTION.md) | 组员方向同步 |
 | [INTEGRATION_PREP.md](INTEGRATION_PREP.md) | 代码整合准备清单 |
 | [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |

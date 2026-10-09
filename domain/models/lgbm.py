@@ -14,6 +14,7 @@ from sqlalchemy import bindparam, text
 from domain.features.build import FEATURE_COLS, prediction_hour_index, prediction_hours
 from domain.models.evaluation import binary_metrics, select_threshold_by_f1
 from domain.models.split import save_split_manifest, split_frame_by_stay
+from domain.models.utility_calibrate import select_threshold_by_net_benefit
 from infra.config import load_yaml
 from infra.db import get_engine
 
@@ -86,15 +87,25 @@ def train_and_save() -> dict:
 
     val_probability = model.predict_proba(X_val)[:, 1]
     test_probability = model.predict_proba(X_test)[:, 1]
+    # Default bedside threshold remains max-F1; H4 utility threshold is also reported.
+    cost_ratio = float(os.environ.get("ICU_COST_RATIO", "4.0"))
+    can_tune = len(X_val) > 0 and y_val.nunique() > 1
     operating_threshold = (
-        select_threshold_by_f1(y_val, val_probability)
-        if len(X_val) > 0 and y_val.nunique() > 1
+        select_threshold_by_f1(y_val, val_probability) if can_tune else 0.5
+    )
+    utility_threshold = (
+        select_threshold_by_net_benefit(
+            y_val, val_probability, cost_ratio=cost_ratio
+        )
+        if can_tune
         else 0.5
     )
     val_default = binary_metrics(y_val, val_probability, threshold=0.5)
     test_default = binary_metrics(y_test, test_probability, threshold=0.5)
     val_operating = binary_metrics(y_val, val_probability, threshold=operating_threshold)
     test_operating = binary_metrics(y_test, test_probability, threshold=operating_threshold)
+    val_utility = binary_metrics(y_val, val_probability, threshold=utility_threshold)
+    test_utility = binary_metrics(y_test, test_probability, threshold=utility_threshold)
 
     metrics: dict = {
         "total_n": int(len(df)),
@@ -110,8 +121,12 @@ def train_and_save() -> dict:
         "stratified": manifest["stratified"],
         "operating_threshold": operating_threshold,
         "threshold_selection": "maximum F1 on validation split",
+        "utility_threshold": utility_threshold,
+        "utility_threshold_selection": f"maximum net benefit on validation (cost_ratio={cost_ratio})",
+        "cost_ratio": cost_ratio,
         "metrics_at_0_5": {"val": val_default, "test": test_default},
         "metrics_at_val_threshold": {"val": val_operating, "test": test_operating},
+        "metrics_at_utility_threshold": {"val": val_utility, "test": test_utility},
     }
     metrics["auc_val"] = val_default["roc_auc"]
     metrics["auc_test"] = test_default["roc_auc"]

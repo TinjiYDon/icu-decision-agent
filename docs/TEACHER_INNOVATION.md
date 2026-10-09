@@ -1,35 +1,44 @@
 # 给老师的创新口径 · icu-decision-agent
 
-> 2026-09-29 · 与桌面汇报 PPT 对齐 · 不宣称外部 SOTA
+> 2026-10-09 · 旧 S2 机制主表 · 不宣称外部 SOTA / 新网络结构  
+> **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（先讲总目标，再讲本页假设）
 
 ## 一句话
 
-**骨干仍是 LightGBM；加深的是标签、评价协议、时序公平对照、可追溯解释。**
+**总目标**：可决策的早期预警 CDSS（效用可校准、融合可证伪、解释可人审）。  
+**骨干仍是 LightGBM**；创新在标签—评价协议、效用阈值、稀疏门控融合与可追溯解释，不在「又换一个模型」。
 
 ## 不要这样讲
 
 - 「我们用了 LightGBM / GRU，所以模型新。」
-- 只报 ROC，不报 PR-AUC / Brier。
-- 把 GRU-D 说成已经替换默认床旁模型。
+- 只报 ROC，不报 PR-AUC / Brier / 净受益。
+- 把 GRU-D / TFT-lite 说成已经替换默认床旁模型。
+- 把无 Layer0 的多时刻轨迹说成「真序列深度学习」。
 
 ## 要这样讲
 
-| 假设 | 相对谁 | 改了什么 | 证据文件 |
-|------|--------|----------|----------|
-| H1 | 粗 `dod` + 单报 AUC | deathtime v2 + DCA | `STATUS.md` · `domain/models/dca.py` |
-| H2 | 两个模型各训各测 | 同 split 双轨；缺 vitals 时 `--labs-only` | `scripts/d3_grud_minimal_compare.py` |
-| H2 深化 | 仅 3 项化验 / 无注意力消融 | 10 项化验序列 · LGBM / GRU-D / TFT-lite 同分层 split · 因果截止 `intime+h` · 旧 +0.031 数字待因果窗重跑后更新（混合抽样，非自然患病率） | `scripts/d3_lab_triple_compare.py` · `artifacts/d3/lab_triple_compare.md` |
-| H3 | 只有 SHAP 条 | RAG 引用校验 + HITL | DX-1 · Streamlit「解释」 |
+| 假设 | 相对谁 | 改了什么 | 旧 S2 证据（本机 2026-10-09） |
+|------|--------|----------|-------------------------------|
+| H1 | 粗标签 + 单报 AUC | DCA / 工作点协议 | `artifacts/dca/` · 验收页 |
+| H2 | 两模型乱比 | 同 split 双轨 | D3 协议；真序列待 Layer0 |
+| H3 | 仅 SHAP 条 | 引用校验 + HITL | DX-1；飞轮种子 KPI |
+| **H4** | val 上 max-F1 | **约束 max-NB**（窗 [0.05,0.40]、报警率≤20%） | thr 0.537→**0.384**；test NB **-0.053→-0.035**（Δ+0.018）；报警率 1.7%→2.2%；PR-AUC 不变 0.139 |
+| **H5** | 单时刻分数 | 完备度门控 × 多时刻轨迹 | h=6：Brier 0.043→**0.040**；NB 略升；**稀疏半** PR-AUC 0.075→**0.086**；整体 PR-AUC 略降（0.164→0.153，容差内） |
 
-## 底座 vs 深化（答辩一页）
+## 底座 vs 机制（答辩一页）
 
 | 层 | 是什么 | 对老师怎么说 |
 |------|--------|----------------|
 | 底座 | MIMIC + 无泄漏特征 + LightGBM | 可复现骨干，不是卖点 |
-| H2 深化 | 10 项化验不规则序列 · GRU-D + TFT-lite 同 split | Layer0 无 chartevents；主看 PR-AUC；负结果也报 |
-| TFT-lite | 时间注意力消融 | 不是 Lim 全文 TFT，不是默认模型 |
+| H4 | 训练—阈值环对准净受益 | **算法/决策机制**：不是事后画曲线 |
+| H5 | 缺测时回退当前时刻、密时信轨迹 | **融合机制**；无 Layer0 时轨迹=多时刻表格代理 |
+| H3 | RAG 引用 + HITL | 可信交付，不是黑箱文案 |
 
-## 演示台
+## 诚实负结果（加分项）
 
-Streamlit：**创新**页 + 验收页 DCA。TFT-lite 烟测：`python scripts/d3_tft_lite_smoke.py`。  
-化验三方：`python scripts/d3_lab_triple_compare.py --limit 600`。
+- 无约束 max-NB 在稀有事件 + cost_ratio=4 下会塌到 treat-all → 必须加临床窗与报警率帽（写进方法）。  
+- H5 在**高完备**子集上融合未必优于单时刻 → 门控不是万能平均。
+
+## 复现
+
+见 [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) 第 8 节。
