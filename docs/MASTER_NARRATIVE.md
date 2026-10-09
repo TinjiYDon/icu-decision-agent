@@ -2,7 +2,8 @@
 
 > **SSOT 叙事入口**（2026-10-09）  
 > 读完本文即可回答：总目标是什么、总内容有哪些、每块如何服务总目标。  
-> 细节数字 → [STATUS.md](STATUS.md)；假设验收 → [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md)；答辩话术 → [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)。
+> 细节数字 → [STATUS.md](STATUS.md)；假设验收 → [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md)；  
+> **架构/公式** → [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md)；答辩话术 → [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)。
 
 ---
 
@@ -120,6 +121,7 @@
 | 类型 | 唯一入口 | 说明 |
 |------|----------|------|
 | **总叙事** | **本文件** | 总目标 + 总内容串线 |
+| **架构与公式** | [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md) | 新旧对比 · H4/H5 数学 · 伪代码 |
 | 学术假设细节 | [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) | 痛点/约束/H1–H5 定义与主表 |
 | 指标与状态 | [STATUS.md](STATUS.md) | 当前数字 |
 | 路线图 | [ROADMAP.md](ROADMAP.md) | 下一拍 |

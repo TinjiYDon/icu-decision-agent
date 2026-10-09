@@ -1,7 +1,7 @@
 # 给老师的创新口径 · icu-decision-agent
 
 > 2026-10-09 · 旧 S2 机制主表 · 不宣称外部 SOTA / 新网络结构  
-> **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（先讲总目标，再讲本页假设）
+> **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · **公式/架构**：[ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md)
 
 ## 一句话
 

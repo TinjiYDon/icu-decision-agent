@@ -5,6 +5,7 @@
 | 文档 | 内容 |
 |------|------|
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / 闭环叙事（SSOT）** |
+| [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md) | **创新架构 · 新旧对比 · 算法公式** |
 | [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
 | [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |

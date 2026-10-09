@@ -19,7 +19,8 @@
 ## 先读
 
 1. **`docs/MASTER_NARRATIVE.md`（总目标 + 总内容串线 · SSOT）**
-2. `docs/ACADEMIC_THESIS.md` · `docs/TEACHER_INNOVATION.md`
+2. **`docs/ARCHITECTURE_MATH.md`（新旧架构 + H4/H5 公式）**
+3. `docs/ACADEMIC_THESIS.md` · `docs/TEACHER_INNOVATION.md`
 3. `docs/STATUS.md` · `docs/ROADMAP.md`
 4. `docs/SOTA_SURVEY.md`（先对标再创新；无 LIT 不宣称 SOTA）
 5. `docs/DUMP_READY.md` · `docs/DEMO_SCRIPT.md`

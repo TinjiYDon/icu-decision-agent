@@ -1,7 +1,7 @@
 # 学术问题与创新纲领 · icu-decision-agent
 
 > 2026-10-09 · 旧 S2 dump（dod 口径）为机制实验主表 · **无** Layer0 真序列 · 不宣称外部 SOTA  
-> **总叙事入口**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（本文展开假设与主表，不另立总目标）
+> **总叙事入口**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · **架构与公式**：[ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md)
 
 ## 1. 痛点
 

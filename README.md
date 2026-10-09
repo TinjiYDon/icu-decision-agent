@@ -4,6 +4,8 @@
 
 **总纲领（先读）**：[`docs/MASTER_NARRATIVE.md`](docs/MASTER_NARRATIVE.md) — 总目标与总内容如何串成一条线  
 
+**架构与公式**：[`docs/ARCHITECTURE_MATH.md`](docs/ARCHITECTURE_MATH.md) — 创新架构、新旧对比、H4/H5 数学定义  
+
 **协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
 
 ## 快速开始

@@ -27,13 +27,21 @@ def render_innovation() -> None:
         "创新在机制，不在换一个时髦网络。"
     )
     st.caption(
-        "默认推理仍是 LightGBM；答辩请按 H1–H5 讲。叙事全文见 docs/MASTER_NARRATIVE.md。"
+        "默认推理仍是 LightGBM；答辩请按 H1–H5 讲。"
+        "叙事 docs/MASTER_NARRATIVE.md · 公式 docs/ARCHITECTURE_MATH.md。"
     )
 
     st.header("闭环串线（总内容）")
     st.code(
         "数据因果 → 骨干打分 → H4效用阈值 → H5稀疏融合 → H3解释人审 → PR-AUC/Brier/NB验收",
         language="text",
+    )
+    st.latex(
+        r"p_{\mathrm{fuse}}=(1-c^{\gamma})\,p^{\mathrm{cur}}+c^{\gamma}\,p^{\mathrm{traj}}"
+    )
+    st.latex(
+        r"\tau_{\mathrm{NB}}=\arg\max_{\tau\in[\tau_{\min},\tau_{\max}]\,:\,\mathrm{Alert}\le\alpha}"
+        r"\,\mathrm{NB}(\tau;\lambda)"
     )
 
     st.header("底座 vs 切口")
