@@ -18,7 +18,7 @@
 |------|--------|----------|----------|
 | H1 | 粗 `dod` + 单报 AUC | deathtime v2 + DCA | `STATUS.md` · `domain/models/dca.py` |
 | H2 | 两个模型各训各测 | 同 split 双轨；缺 vitals 时 `--labs-only` | `scripts/d3_grud_minimal_compare.py` |
-| H2 深化 | 仅 3 项化验 / 无注意力消融 | 10 项化验序列 · LGBM / GRU-D / TFT-lite 同分层 split · GRU PR-AUC +0.031 vs LGBM（混合抽样，非自然患病率） | `scripts/d3_lab_triple_compare.py` · `artifacts/d3/lab_triple_compare.md` |
+| H2 深化 | 仅 3 项化验 / 无注意力消融 | 10 项化验序列 · LGBM / GRU-D / TFT-lite 同分层 split · 因果截止 `intime+h` · 旧 +0.031 数字待因果窗重跑后更新（混合抽样，非自然患病率） | `scripts/d3_lab_triple_compare.py` · `artifacts/d3/lab_triple_compare.md` |
 | H3 | 只有 SHAP 条 | RAG 引用校验 + HITL | DX-1 · Streamlit「解释」 |
 
 ## 底座 vs 深化（答辩一页）

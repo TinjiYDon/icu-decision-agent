@@ -32,3 +32,17 @@ def test_tft_lite_rejects_bad_heads():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+def test_tft_lite_order_sensitive_with_positional_encoding():
+    torch.manual_seed(0)
+    model = TFTLite(input_size=2, d_model=16, nhead=4, num_layers=1)
+    model.eval()
+    x = torch.tensor([[[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]])
+    m = torch.ones_like(x)
+    d = torch.ones_like(x)
+    x_rev = torch.flip(x, dims=[1])
+    with torch.no_grad():
+        a = model(x, m, d)
+        b = model(x_rev, m, d)
+    assert not torch.allclose(a, b, atol=1e-5)

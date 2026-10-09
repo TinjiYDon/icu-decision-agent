@@ -8,8 +8,23 @@ LightGBM.
 
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn as nn
+
+
+def _sinusoidal_positions(n_steps: int, d_model: int, device: torch.device) -> torch.Tensor:
+    """Standard transformer positional encodings (T, d_model)."""
+    pos = torch.arange(n_steps, device=device, dtype=torch.float32).unsqueeze(1)
+    div = torch.exp(
+        torch.arange(0, d_model, 2, device=device, dtype=torch.float32)
+        * (-math.log(10000.0) / d_model)
+    )
+    pe = torch.zeros(n_steps, d_model, device=device, dtype=torch.float32)
+    pe[:, 0::2] = torch.sin(pos * div)
+    pe[:, 1::2] = torch.cos(pos * div[: pe[:, 1::2].shape[1]])
+    return pe
 
 
 class TFTLite(nn.Module):
@@ -54,6 +69,8 @@ class TFTLite(nn.Module):
         delta = torch.nan_to_num(delta, nan=0.0, posinf=1e4, neginf=0.0).clamp(min=0.0)
         feat = torch.cat([x * m, m, torch.log1p(delta)], dim=-1)
         h = self.input_proj(feat)
+        # Order-aware: without PE, mean-pooled Transformer is permutation-invariant.
+        h = h + _sinusoidal_positions(h.size(1), self.d_model, h.device).unsqueeze(0)
         observed = m.sum(dim=-1) > 0
         pad_mask = ~observed
         all_pad = pad_mask.all(dim=1)
