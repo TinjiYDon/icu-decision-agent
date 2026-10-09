@@ -11,6 +11,7 @@
 | 定位 | **独立** ICU 早期恶化预警 + AIGC 人机协同 CDSS |
 | 禁止 | 调用 scheduling 床位 API |
 | 已采入 | **DX-1** 解释可信 · **DX-2** DCA · **DX-3** 公平双轨（主报 PR-AUC/Brier） |
+| 老师口径 | [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) · Streamlit「创新」页 |
 | 本周请做 | pull → 按 INTEGRATION_PREP 跑 pytest；D3 报告看 PR-AUC 主表 |
 
 ## 命名对照

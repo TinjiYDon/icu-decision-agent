@@ -46,7 +46,10 @@ ICU **实时早期恶化预警 + AIGC 人机协同 CDSS**：预测时刻 `t=inti
 | 解释安全对照 D1 | ✅ 四模式评测 · **50 stays 真实数据**（2026-09-15）· 7项指标 → **10项指标**（D1.2+D1.3 已集成）· Streamlit「解释安全」页 |
 | D1 50 stays 10项指标 | B:对齐0.94/覆盖0%/grounding50%/一致1.0 · D:对齐0.94/覆盖0%/grounding85.8%✅/引效53.3%✅/过承8.3%/具体100%✅/一致72.5%/可读100%✅ · **D1.2/D1.3 改造完成**：引用校验分段容差+parent_content → 引效44.9%→53.3%；RAG路由扩展至18主题；Prompt因果词白名单；新增3项D1.3指标 |
 | GRU-D | ✅ PR#11 已合；D1：稀疏门控 + 同 split manifest 对照 + `train_grud --real` / `compare_dual_track` |
-| D3 GRU-D 真序列最小对照 | ✅ 完成 · 真实数据验证（94458 stay, 2000 对照）· GRU-D AUC=0.683 vs LGBM AUC=0.500（+0.18）· 非空率：hr98%/spo2 98%/lactate 44%/BUN 68%· 时序信息提供增量价值 · 报告：artifacts/d3/report.md |
+| D3 GRU-D 真序列最小对照 | ✅ 协议已落地（主表 **PR-AUC / Brier**）· labs-only 真跑（limit=400）：GRU PR-AUC **0.046** vs LGBM **0.053**（差 -0.007，容差内通过）· 报告 `artifacts/d3/report.md` · vitals 非空率 0（dump 口径） |
+| TFT-lite | ✅ 同 (x,m,δ) 注意力消融 · `python scripts/d3_tft_lite_smoke.py` · **非**默认模型 |
+| D3 真库试跑 | ✅ `--labs-only` 通路；缺 chartevents 时不宣称「完整监护时序增益」 |
+| 化验时序深化 | ✅ 10 项化验 · 阳/阴混合抽样 + **分层 split** · LGBM / GRU-D / TFT-lite · n=532 · test 正例 15 · **PR-AUC**：LGBM **0.471** · GRU-D **0.502**（+0.031）· TFT-lite **0.451**（−0.020）· Brier：LGBM 0.242 / GRU 0.223 / TFT 0.199 · `artifacts/d3/lab_triple_compare.md` · **非**自然患病率（混合抽样）· 默认床旁仍 LGBM |
 | HITL / care_plan | ✅ 解释页反馈 audit · Streamlit「规划」页 · 非床位调度 |
 | SOTA 对标 | ✅ [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 H1–H3 |
 | 数据飞轮 | ✅ [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `python -m application.summarize_hitl` |
@@ -56,7 +59,7 @@ ICU **实时早期恶化预警 + AIGC 人机协同 CDSS**：预测时刻 `t=inti
 
 | KPI | 来源 | 当前 |
 |-----|------|------|
-| 周解释次数 / 采纳率 / 驳回率 / 编辑率 | `summarize_hitl` | 跑命令后写入本表 |
+| 周解释次数 / 采纳率 / 驳回率 / 编辑率 | `summarize_hitl` | **empty**（尚无 `artifacts/hitl/explain_audit.jsonl`） |
 
 ### 监测台注意
 

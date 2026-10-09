@@ -8,6 +8,10 @@ import numpy as np
 
 from infra.config import load_yaml
 
+# Finite stand-in for "never observed" when right-padding delta.
+# Must stay well below float32 overflow and well above any real gap in hours.
+PAD_DELTA = 1e4
+
 
 def load_temporal_cfg() -> dict[str, Any]:
     return load_yaml("temporal.yaml").get("temporal", {})
@@ -69,6 +73,19 @@ def apply_recency_weights(times_hours: np.ndarray, lam: float) -> np.ndarray:
 def pad_truncate(
     x: np.ndarray, m: np.ndarray, d: np.ndarray, max_t: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Right-pad short sequences to `max_t`.
+
+    Padding convention: real observations keep their order at the FRONT, and
+    zero/inf rows are appended at the END. Callers that build per-timestep
+    labels must follow the same convention (see `predict_grud.time_labels`).
+
+    delta padding uses a large finite sentinel rather than ``inf``: downstream
+    decay computes ``w * delta`` with learnable ``w`` initialised to 0, and
+    ``0 * inf`` yields NaN, which silently poisons the whole forward pass.
+    ``PAD_DELTA`` is far beyond any real inter-observation gap, so
+    ``exp(-max(0, w * PAD_DELTA))`` still saturates the decay to ~0 exactly as
+    ``inf`` would, while staying numerically safe.
+    """
     T, F = x.shape
     if T >= max_t:
         return x[-max_t:], m[-max_t:], d[-max_t:]
@@ -76,5 +93,5 @@ def pad_truncate(
     return (
         np.vstack([x, np.zeros((pad, F))]),
         np.vstack([m, np.zeros((pad, F))]),
-        np.vstack([d, np.full((pad, F), np.inf)]),
+        np.vstack([d, np.full((pad, F), PAD_DELTA)]),
     )

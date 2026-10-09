@@ -60,7 +60,15 @@ class GRUD(nn.Module):
         )
 
     def _decay(self, w: torch.Tensor, b: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
-        """γ = exp(-max(0, W·delta + b)), delta shape must broadcast with (w, b)."""
+        """γ = exp(-max(0, W·delta + b)), delta shape must broadcast with (w, b).
+
+        delta is sanitised first: padding sentinels may arrive as ±inf, and
+        `w * inf` is NaN whenever the learnable `w` is still 0 (its init value),
+        which silently turns the whole forward pass into NaN. Clamping to a
+        large finite value keeps the intended "maximal decay" saturation while
+        staying numerically safe.
+        """
+        delta = torch.nan_to_num(delta, nan=0.0, posinf=1e4, neginf=0.0)
         log_decay = w.unsqueeze(0) * delta + b.unsqueeze(0)
         return torch.exp(-torch.clamp(log_decay, min=0.0))
 

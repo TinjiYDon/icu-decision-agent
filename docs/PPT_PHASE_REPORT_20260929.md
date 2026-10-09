@@ -5,9 +5,13 @@
 > 导出：可用 OpenClaw `/ppt` 转 `.pptx`（本文件为大纲）
 
 ## 1. 封面
-- 标题：ICU 早期恶化预警 + 人机协同 CDSS
-- 副题：DX-1/2/3 · ADR-001 · 主指标 PR-AUC/Brier
-- 日期：2026-09-29 · Owner：TinjiYDon
+- 标题：ICU 预警——创新不在「又一个 LightGBM」
+- 副题：H1 标签/DCA · H2 公平双轨 · H3 解释可信
+- 日期：2026-09-29
+
+## 2. 底座 vs 切口（老师第一问）
+- 底座：MIMIC + 无泄漏特征 + LightGBM 默认推理
+- 切口：deathtime v2、PR-AUC/Brier、DCA、GRU-D 同 split、SHAP→RAG→LLM
 
 ## 2. 问题定义
 - 预测时刻 \(t=\mathrm{intime}+h\)，\(h\in\{0,1,2,4,6\}\)

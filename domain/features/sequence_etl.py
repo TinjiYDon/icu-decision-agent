@@ -22,7 +22,12 @@ def feature_names() -> list[str]:
     return list(FEATURE_NAMES)
 
 
-def passes_sparse_gate(mask: np.ndarray, *, feature_names_list: list[str] | None = None) -> bool:
+def passes_sparse_gate(
+    mask: np.ndarray,
+    *,
+    feature_names_list: list[str] | None = None,
+    require_any_vital: bool | None = None,
+) -> bool:
     """Reject near-empty sequences per temporal.yaml sparse thresholds."""
     cfg = load_temporal_cfg()
     m = np.asarray(mask, dtype=np.float64)
@@ -35,7 +40,12 @@ def passes_sparse_gate(mask: np.ndarray, *, feature_names_list: list[str] | None
         return False
     if observed / float(m.size) < min_ratio:
         return False
-    if cfg.get("require_any_vital", True):
+    need_vital = (
+        bool(cfg.get("require_any_vital", True))
+        if require_any_vital is None
+        else bool(require_any_vital)
+    )
+    if need_vital:
         names = feature_names_list or feature_names()
         vital_keys = {str(k) for k in cfg.get("vital_keys", ["hr", "sbp", "spo2", "resp_rate", "temperature"])}
         vital_idx = [i for i, n in enumerate(names) if n in vital_keys]
