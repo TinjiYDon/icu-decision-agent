@@ -47,8 +47,9 @@
 | **H3** | 解释可信 + HITL | 仅 SHAP 条 | 引用校验 / RAG / audit | 引用有效率、采纳率 |
 | **H4** | **效用校准工作点（UCEW）** | val 上 max-F1 再事后 DCA | val 上 **max net benefit(cost_ratio)** 选阈值 | test NB↑ 或同 NB 报警更少；PR-AUC/Brier 不崩 |
 | **H5** | **稀疏门控多时刻融合（SGDF）** | 单时刻分数 / 无门控平均 | 用特征完备度门控「当前时刻」vs「多时刻轨迹」 | 同 split 下 PR-AUC/Brier 不劣；高稀疏子集门控可解释 |
+| **H6** | **CUGEW**：DEI/ANB/UEI + RWSG + SUFH | 仅 AUC；均匀轨迹；无二级头 | 新决策指数 + 近因门控 + 可训练融合头 | **UEI/DEI** 主比较；PR-AUC/Brier 辅证 |
 
-> H5 在无 Layer0 时：时序轨 = **同模型多 `hour_index` 概率轨迹**（tabular trajectory surrogate），**不是** GRU-D 真序列；有 Layer0 后再换真序列轨，协议不变。
+> H5/H6 在无 Layer0 时：轨迹 = **多时刻表格概率**（可近因加权）；有 Layer0 后可换 GRU-D，**门控与 SUFH 公式不变**。
 
 ## 7. 非宣称
 

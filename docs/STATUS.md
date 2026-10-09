@@ -53,7 +53,8 @@ ICU **实时早期恶化预警 + AIGC 人机协同 CDSS**：预测时刻 `t=inti
 | HITL / care_plan | ✅ 解释页反馈 audit · Streamlit「规划」页 · 非床位调度 |
 | SOTA 对标 | ✅ [SOTA_SURVEY.md](SOTA_SURVEY.md) · 假设 **H1–H5** |
 | **H4 效用校准 UCEW** | ✅ 旧 S2：F1 thr=0.537→**NB thr=0.384**（窗[0.05,0.40]、报警≤20%）· test NB **-0.053→-0.035**（Δ**+0.018**）· 报警 1.7%→2.2% · PR-AUC 不变 **0.139** · `artifacts/h4/utility_compare.md` |
-| **H5 稀疏门控融合** | ✅ 旧 S2 h=6：轨迹=多时刻 LGBM 代理（无 Layer0）· Brier **0.043→0.040** · 稀疏半 PR-AUC **0.075→0.086** · 整体 PR-AUC 0.164→0.153（容差）· `artifacts/h5/sparsity_fusion.md` |
+| **H5 稀疏门控融合** | ✅ 旧 S2 h=6：均匀轨迹门控 · 见 H6 升级版 |
+| **H6 CUGEW（主创新）** | ✅ **新指标** DEI/ANB/UEI · **新算法** RWSG（近因加权门控）+ **SUFH**（逻辑融合头）· h=6：legacy→RWSG→SUFH 的 PR-AUC **0.164→0.168→0.177**，Brier **0.043→0.042→0.022**，**UEI 2.300→2.301→2.410**（SUFH 最优）· `artifacts/h6/cugew_suite.md` |
 | 数据飞轮 | ✅ [DATA_FLYWHEEL.md](DATA_FLYWHEEL.md) · `python -m application.summarize_hitl` |
 | S2 dump 文件 | ✅ 本机已 restore **旧 S2**（20260802）→ Docker `:5433` · feat/label **472,290** · 五时刻齐全 · **非 v2**（阳性≈2.34%）· 权威 v2 见 [DUMP_READY.md](DUMP_READY.md) |
 | 本机整合（2026-10-09） | ✅ Docker · pytest H4/H5 单测绿 · train PR-AUC **0.139** / Brier **0.040** · DCA 已生成 · D3 `--mock` 通 · 真序列/因果窗三方 ⚠ 缺 Layer0 `mimic` |

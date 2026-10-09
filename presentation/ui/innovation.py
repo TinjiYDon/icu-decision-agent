@@ -16,6 +16,7 @@ TFT_JSON = ROOT / "artifacts" / "d3" / "tft_lite.json"
 LAB_TRIPLE = ROOT / "artifacts" / "d3" / "lab_triple_compare.json"
 H4_JSON = ROOT / "artifacts" / "h4" / "utility_compare.json"
 H5_JSON = ROOT / "artifacts" / "h5" / "sparsity_fusion.json"
+H6_JSON = ROOT / "artifacts" / "h6" / "cugew_suite.json"
 MASTER = ROOT / "docs" / "MASTER_NARRATIVE.md"
 
 
@@ -64,9 +65,9 @@ def render_innovation() -> None:
                     "对老师怎么说": "训练—阈值环对准临床代价",
                 },
                 {
-                    "层": "H2 / H5 融合",
-                    "是什么": "公平双轨 + 稀疏门控多时刻",
-                    "对老师怎么说": "缺测时信谁，可证伪；无 Layer0 时轨迹=多时刻代理",
+                    "层": "H6 CUGEW（主创新）",
+                    "是什么": "DEI/ANB/UEI + RWSG + SUFH",
+                    "对老师怎么说": "新指数 + 近因门控算法 + 可训练融合头",
                 },
                 {
                     "层": "H3 解释可信",
@@ -78,6 +79,20 @@ def render_innovation() -> None:
         use_container_width=True,
         hide_index=True,
     )
+
+    st.header("H6 CUGEW（请重点讲）")
+    if H6_JSON.is_file():
+        h6 = json.loads(H6_JSON.read_text(encoding="utf-8"))
+        st.caption(h6.get("note", ""))
+        st.dataframe(pd.DataFrame(h6.get("rows", [])), use_container_width=True, hide_index=True)
+        st.success(f"主比较指数 UEI 最优策略：**{h6.get('best_by_UEI')}**")
+        st.latex(r"\mathrm{UEI}=\mathrm{DEI}\cdot(1-\mathrm{AlertRate})")
+        st.latex(
+            r"p^{\mathrm{rw}}=\sum_{h'\le h}e^{-\beta(h-h')}p_{h'}/Z,\quad "
+            r"p^{\mathrm{SUFH}}=\sigma(w^\top z+b)"
+        )
+    else:
+        st.info("运行 `python scripts/h6_cugew_suite.py --hour-index 6`")
 
     st.header("H4 效用校准（旧 S2）")
     if H4_JSON.is_file():

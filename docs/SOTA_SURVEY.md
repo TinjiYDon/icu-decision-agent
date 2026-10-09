@@ -54,6 +54,7 @@
 | **H3** | SHAP→RAG→LLM **解释可信工程** + HITL 优于「仅 SHAP 条」 | 纯可视化 Demo | 分段容差、RAG18、详解 Prompt、audit | 引用 valid 率 + 周 **采纳率**（飞轮） |
 | **H4** | **效用校准工作点（UCEW）**：val 上 max NB（临床窗+报警率帽）优于 max F1 | 先 F1 再事后 DCA | `select_threshold_by_net_benefit` | test **ΔNB**、报警率帽内；PR-AUC 不变 |
 | **H5** | **稀疏门控多时刻融合（SGDF）** | 单时刻 / 无门控平均 | 完备度门控当前时刻 vs 多时刻轨迹 | PR-AUC 容差 / Brier·NB；稀疏子集可解释 |
+| **H6** | **CUGEW**：新指数 DEI/ANB/UEI + RWSG + SUFH | 仅 AUC/F1；均匀轨迹；无二级头 | 近因加权门控 + 可训练融合头 + 决策效用指数 | UEI/DEI 主比较；PR-AUC/Brier 辅证 |
 
 ### 已采入工程落点（2026-10-09）
 
@@ -65,6 +66,7 @@
 | H3 | `reference_validator` / `rag_retriever` / `prompts` / `quality_eval` | DX-1 供给侧 |
 | H4 | `domain/models/utility_calibrate.py` · `scripts/h4_utility_compare.py` | 旧 S2 真跑见 `artifacts/h4/` |
 | H5 | `domain/models/sparsity_fusion.py` · `scripts/h5_sparsity_fusion.py` | 无 Layer0：多时刻 LGBM 轨迹代理 |
+| H6 | `decision_indices.py` · `sufh.py` · `scripts/h6_cugew_suite.py` | **CUGEW 主创新**；旧 S2 已真跑 |
 
 ---
 

@@ -31,6 +31,7 @@ non_goals: replace TreeSHAP→RAG→LLM; call scheduling optimize; claim SOTA ne
 | **DX-3** | 公平双轨协议（同 h / split / stay 对齐） | ✅ PR#18 | H2 协议 |
 | **H4** | 效用校准工作点 UCEW（约束 max-NB） | ✅ 旧 S2 真跑 | H4 |
 | **H5** | 稀疏门控多时刻融合 SGDF | ✅ 旧 S2（轨迹代理） | H5 |
+| **H6** | **CUGEW**：DEI/ANB/UEI + RWSG + SUFH | ✅ 旧 S2 真跑 | H6 |
 | D0 | GRU-D 链路 | ✅ PR#11 | — |
 
 ## 下一阶段计划

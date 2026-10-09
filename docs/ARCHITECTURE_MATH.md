@@ -1,7 +1,8 @@
 # 创新架构 · 新旧对比 · 算法与数学公式
 
 > 与 [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) 配套 · 2026-10-09  
-> **说明**：骨干分类器仍为 LightGBM；「架构创新」指 **决策—融合—可信交付的系统架构与机制层**，不是新深度网络拓扑。
+> **命名框架：CUGEW**（Causal Utility-Gated Early Warning）  
+> 骨干打分仍为 LightGBM；**可辩护创新**在命名指标（DEI/ANB/UEI）、近因稀疏门控（RWSG）与稀疏效用融合头（SUFH）。
 
 ---
 
@@ -265,23 +266,85 @@ Input: stay s, hour h, cost_ratio λ, gate_power γ
 
 ---
 
-## 11. 与「调包拼模型」指控的对应答复
+## 11. H6 · CUGEW：新指标 + 新算法（主创新点）
 
-| 指控 | 本架构回应 |
-|------|------------|
-| 只是 LightGBM | 骨干是底座；**可发表切口在 \(\tau_{\mathrm{NB}}\) 与 \(p_{\mathrm{fuse}}\) 机制** |
-| GRU/TFT 凑数 | 明确为对照/消融；默认推理不替换 |
-| 无公式 | 本文给出 NB、约束优化、门控融合闭式 |
-| 无新旧对比 | §2 / §6.2–6.3 / §7.3 表格对照 |
+### 11.1 新指标（Indexes）
+
+在工作点 \(\tau\)、代价比 \(\lambda\) 下定义：
+
+\[
+\begin{aligned}
+\mathrm{DEI}(\tau;\lambda)
+&=\mathrm{NB}_{\mathrm{model}}(\tau;\lambda)-\mathrm{NB}_{\mathrm{all}}(\tau;\lambda)
+\quad\text{（相对全干预的超额净受益）},\\[6pt]
+\mathrm{ANB}(\tau;\lambda)
+&=\frac{\mathrm{NB}_{\mathrm{model}}(\tau;\lambda)}{\max(\mathrm{AlertRate}(\tau),\varepsilon)}
+\quad\text{（单位报警负荷的净受益）},\\[6pt]
+\mathrm{UEI}(\tau;\lambda)
+&=\mathrm{DEI}(\tau;\lambda)\cdot\bigl(1-\mathrm{AlertRate}(\tau)\bigr)
+\quad\text{（超额效用 × 选择性）}.
+\end{aligned}
+\]
+
+**相对旧指标**：ROC/PR-AUC 只刻画排序；**DEI/ANB/UEI** 把「是否优于全干预」与「报警是否克制」编码进单一可比较指数。
+
+### 11.2 新算法 A：近因加权稀疏门控（RWSG）
+
+对 \(h'\le h\)：
+
+\[
+p^{\mathrm{rw}}(s,h)
+=\frac{\sum_{h'\le h}\mathrm{e}^{-\beta(h-h')}\,p(s,h')}
+{\sum_{h'\le h}\mathrm{e}^{-\beta(h-h')}},
+\qquad
+p^{\mathrm{RWSG}}=(1-c^{\gamma})\,p^{\mathrm{cur}}+c^{\gamma}\,p^{\mathrm{rw}}.
+\]
+
+**相对旧均匀均值轨迹**：近因指数衰减强调最近时刻；再与完备度门控相乘，缺测时回退当前点。
+
+### 11.3 新算法 B：稀疏效用融合头（SUFH）
+
+在验证集上仅用 meta 特征训练逻辑回归（**非**重训骨干）：
+
+\[
+\mathbf{z}=\bigl[p^{\mathrm{cur}},\,p^{\mathrm{rw}},\,c,\,p^{\mathrm{cur}}-p^{\mathrm{rw}}\bigr],
+\qquad
+p^{\mathrm{SUFH}}=\sigma(\mathbf{w}^\top\mathbf{z}+b).
+\]
+
+**相对旧单模型输出**：这是一个显式的 **二级决策模型**（融合头），专门学习「当前点 / 近因轨迹 / 完备度」的非线性权衡；系数可解释、可汇报。
+
+### 11.4 旧 S2（h=6）主结果摘要
+
+| 策略 | PR-AUC | Brier | DEI | UEI | 角色 |
+|------|-------:|------:|----:|----:|------|
+| legacy 当前时刻 | 0.164 | 0.043 | 2.365 | 2.300 | 旧基线 |
+| **RWSG 门控** | **0.168** | **0.042** | 2.365 | 2.301 | 新门控算法 |
+| **SUFH 融合头** | **0.177** | **0.022** | **2.410** | **2.410** | 新二级模型 |
+
+细节：`artifacts/h6/cugew_suite.md`。
 
 ---
 
-## 12. 相关文件
+## 12. 与「调包拼模型」指控的对应答复
+
+| 指控 | 本架构回应 |
+|------|------------|
+| 只是 LightGBM | 骨干是底座；**发表点是 DEI/ANB/UEI + RWSG + SUFH** |
+| 没有新模型 | **SUFH** 是可训练的二级融合模型（逻辑头） |
+| 没有新指标 | **DEI / ANB / UEI** 为决策效用指数族 |
+| GRU/TFT 凑数 | 对照/消融；不进入默认推理 |
+
+---
+
+## 13. 相关文件
 
 | 内容 | 路径 |
 |------|------|
 | 总叙事 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) |
 | 假设与主表数字 | [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) |
-| H4 实现 | `domain/models/utility_calibrate.py` |
-| H5 实现 | `domain/models/sparsity_fusion.py` |
+| H4 效用阈值 | `domain/models/utility_calibrate.py` |
+| H5 均匀门控 | `domain/models/sparsity_fusion.py` |
+| **H6 指标** | `domain/models/decision_indices.py` |
+| **H6 RWSG/SUFH** | `domain/models/sufh.py` · `scripts/h6_cugew_suite.py` |
 | DCA | `domain/models/dca.py` |
