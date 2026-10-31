@@ -23,6 +23,7 @@
 | [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 / 常见问题 |
 | [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化建议 |
 | [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md) | 里程碑 |
+| [H9_SBR.md](H9_SBR.md) | **H9 选择性复核（预算约束序贯停止）原型** |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
 
 ## ADR
