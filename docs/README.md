@@ -23,6 +23,10 @@
 | [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 / 常见问题 |
 | [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化建议 |
 | [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md) | 里程碑 |
+| [H9_SBR.md](H9_SBR.md) | **H9 选择性复核（预算约束序贯停止）原型** |
+| [PAC_SAFETY_NET.md](PAC_SAFETY_NET.md) | **H9-I4 PAC 双阈值安全网（放行区漏检的有限样本保证）** |
+| [INNOVATION_PORTFOLIO.md](INNOVATION_PORTFOLIO.md) | **创新点集合（全部创新点 + 可主张性）** |
+| [TECH_REPORT_H9.md](TECH_REPORT_H9.md) | **H9 技术文档（函数/公式/架构/方法论）** |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
 
 ## ADR
