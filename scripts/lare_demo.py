@@ -11,7 +11,8 @@
    review yield、放行区漏检质量、预算与差值；
 2. 按各自标签单独选出的双阈值 —— 阈值差、复核集合 Jaccard；
 3. `fit_lar_policy`（min-max 鲁棒）—— tau / robust_cost / cost_dod / cost_death，
-   以及相对标签专属最优的 max regret；附 alpha=1%（严格口径）的可行性对照。
+   以及相对标签专属最优的 max regret；附 alpha=1%（严格口径）的可行性对照；
+   并列出 `bound="none"`（经验风险）与 `bound="hoeffding"`（有限样本上界）的对比。
 """
 
 from __future__ import annotations
@@ -45,7 +46,9 @@ FIXED_TAU_HIGH = 0.3
 DEFAULT_K = 0.2
 DEFAULT_ALPHA = 0.05
 STRICT_ALPHA = 0.01
+DEFAULT_DELTA = 0.1
 N_GRID = 50
+BOUNDS = ("none", "hoeffding")
 
 
 def make_synthetic(n: int, seed: int, add_rate: float):
@@ -66,7 +69,7 @@ def _json_number(x: float):
 
 def _policy_json(policy: LARPolicy) -> dict:
     row = asdict(policy)
-    for key in ("robust_cost", "cost_dod", "cost_death"):
+    for key in ("robust_cost", "cost_dod", "cost_death", "risk_ub_dod", "risk_ub_death"):
         row[key] = _json_number(float(row[key]))
     return row
 
@@ -76,6 +79,10 @@ def main() -> int:
     ap.add_argument("--n", type=int, default=4000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--add-rate", type=float, default=0.5)
+    ap.add_argument("--bound", choices=BOUNDS, default="none",
+                    help="可行性口径：none=经验风险，hoeffding=有限样本上界")
+    ap.add_argument("--delta", type=float, default=DEFAULT_DELTA,
+                    help="Hoeffding 上界的失败概率（仅 bound=hoeffding 生效）")
     ap.add_argument("--output", default="")
     args = ap.parse_args()
 
@@ -83,6 +90,8 @@ def main() -> int:
         raise SystemExit("--n 至少为 10")
     if not 0.0 <= args.add_rate <= 1.0:
         raise SystemExit("--add-rate 必须落在 [0, 1]")
+    if not 0.0 < args.delta < 1.0:
+        raise SystemExit("--delta 必须落在 (0, 1)")
 
     p, y_dod, y_death = make_synthetic(args.n, args.seed, args.add_rate)
 
@@ -99,14 +108,22 @@ def main() -> int:
     death_masks = double_policy(p, ls["death"]["tau_low"], ls["death"]["tau_high"])
     jaccard = reviewed_jaccard(dod_masks["review"], death_masks["review"])
 
-    policy = fit_lar_policy(
-        p, y_dod, y_death, K=DEFAULT_K, alpha=DEFAULT_ALPHA, n_grid=N_GRID
-    )
-    regret = max_regret(
-        p, y_dod, y_death, policy, K=DEFAULT_K, alpha=DEFAULT_ALPHA, n_grid=N_GRID
-    )
+    # 两种可行性口径的对照（bound=none 为经验风险，hoeffding 为有限样本上界）
+    by_bound = {}
+    for name in BOUNDS:
+        pol = fit_lar_policy(
+            p, y_dod, y_death, K=DEFAULT_K, alpha=DEFAULT_ALPHA, n_grid=N_GRID,
+            bound=name, delta=args.delta,
+        )
+        reg = max_regret(
+            p, y_dod, y_death, pol, K=DEFAULT_K, alpha=DEFAULT_ALPHA, n_grid=N_GRID
+        )
+        by_bound[name] = (pol, float(reg))
+    policy, regret = by_bound[args.bound]
+
     strict = fit_lar_policy(
-        p, y_dod, y_death, K=DEFAULT_K, alpha=STRICT_ALPHA, n_grid=N_GRID
+        p, y_dod, y_death, K=DEFAULT_K, alpha=STRICT_ALPHA, n_grid=N_GRID,
+        bound=args.bound, delta=args.delta,
     )
     strict_regret = max_regret(
         p, y_dod, y_death, strict, K=DEFAULT_K, alpha=STRICT_ALPHA, n_grid=N_GRID
@@ -179,6 +196,8 @@ def main() -> int:
         "",
         "| field | value |",
         "|---|---:|",
+        f"| bound (selected by --bound) | {args.bound} |",
+        f"| delta | {args.delta} |",
         f"| tau_low | {policy.tau_low:.4f} |",
         f"| tau_high | {policy.tau_high:.4f} |",
         f"| feasible | {policy.feasible} |",
@@ -188,8 +207,33 @@ def main() -> int:
         ),
         f"| cost_dod | {_fmt(policy.cost_dod)} |",
         f"| cost_death | {_fmt(policy.cost_death)} |",
+        f"| risk_ub_dod | {_fmt(policy.risk_ub_dod)} |",
+        f"| risk_ub_death | {_fmt(policy.risk_ub_death)} |",
         f"| n_release | {policy.n_release} |",
         f"| max_regret vs label-specific | {_fmt(regret)} |",
+        "",
+        f"### 3.1) 可行性口径对比（K={DEFAULT_K}, alpha={DEFAULT_ALPHA}, delta={args.delta}）",
+        "",
+        "| bound | tau_low | tau_high | feasible | robust_cost | risk_ub_dod | risk_ub_death | n_release | max_regret |",
+        "|---|---:|---:|---|---:|---:|---:|---:|---:|",
+    ]
+    for name in BOUNDS:
+        pol, reg = by_bound[name]
+        low_s = f"{pol.tau_low:.4f}"
+        high_s = f"{pol.tau_high:.4f}"
+        lines.append(
+            f"| {name} | {low_s} | {high_s} | {pol.feasible} | "
+            f"{_fmt(pol.robust_cost)} | {_fmt(pol.risk_ub_dod)} | "
+            f"{_fmt(pol.risk_ub_death)} | {pol.n_release} | {_fmt(reg)} |"
+        )
+    lines += [
+        "",
+        (
+            "note: bound=hoeffding 用 radius=sqrt(log(m/delta)/(2n))、"
+            f"m={N_GRID * (N_GRID - 1) // 2}（n_grid={N_GRID} 的候选对数）；"
+            "可行要求两套标签的 (经验风险+radius) 都 <= alpha，因此 \"none 可行\" 不能推出 hoeffding 可行，"
+            "但 hoeffding 可行必然 none 可行。"
+        ),
         "",
         (
             f"strict alpha={STRICT_ALPHA}: feasible={strict.feasible}, "
@@ -212,6 +256,8 @@ def main() -> int:
             "alpha": DEFAULT_ALPHA,
             "strict_alpha": STRICT_ALPHA,
             "n_grid": N_GRID,
+            "bound": args.bound,
+            "delta": args.delta,
             "fixed_policy": {"tau_low": FIXED_TAU_LOW, "tau_high": FIXED_TAU_HIGH},
             "base_rate_death": float(y_death.mean()),
             "base_rate_dod": float(y_dod.mean()),
@@ -233,6 +279,13 @@ def main() -> int:
             "robust_policy": {
                 **_policy_json(policy),
                 "max_regret": _json_number(float(regret)),
+            },
+            "bounds": {
+                name: {
+                    **_policy_json(by_bound[name][0]),
+                    "max_regret": _json_number(float(by_bound[name][1])),
+                }
+                for name in BOUNDS
             },
             "strict_alpha": {
                 **_policy_json(strict),

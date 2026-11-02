@@ -101,6 +101,42 @@ cost = mean( cost_fn · 1{y=1, release}
 用于量化“口径切换代价”；`max_regret = max(cost_dod - opt_dod, cost_death - opt_death)`
 即相对标签专属最优的最大后悔（某标签专属最优不可行时该标签按 0 计）。
 
+### 3.1 有限样本上界（`bound="hoeffding"`）
+
+上面的可行性判断用的是**经验**放行风险（同一批样本既选阈值又验约束），因此 `robust_cost`
+偏乐观。开 `bound="hoeffding"` 时改用**单侧 Hoeffding 上界**（与
+`domain.models.pac_safety_net.hoeffding_radius` 同口径、同一 union bound 写法）：
+
+```
+m = n_grid(n_grid - 1) / 2                      # tau_low < tau_high 的候选对数（50 网格 → 1225）
+radius = sqrt( log(m / delta) / (2n) )          # 默认 delta = 0.1（即 90% 置信）
+可行 ⇔  release_risk_dod   + radius <= alpha
+    且  release_risk_death + radius <= alpha
+    且  (n_review + n_alert) / n <= K           # 预算约束不变（确定性，无需上界）
+目标：仍是  min max( cost_dod , cost_death )   # 代价不加界，只收紧可行域
+```
+
+- `m` 个候选共用一次 union bound，故每个候选的失败概率是 `delta/m`；
+  `n_grid` 越大 `radius` 越大（候选越多、多重比较越贵），所以**扩大网格不能换来小样本可行性**；
+- 选中候选的两个上界写进 `risk_ub_dod / risk_ub_death`（未启用上界时保持 `inf`，向后兼容）；
+- 单调性：`hoeffding 可行 ⇒ none 可行`，反向不成立；因此加上界后 `robust_cost` **只会变差或不变**；
+- 非法 `bound` / `delta ∉ (0,1)` → `ValueError`；`delta` 默认 `0.1`，调小会同时放大 `radius`（更保守）。
+
+**与 `n≈47k` 边界的关系**：`alpha=1%` 时（§5 的严格口径，`feasible=False`），
+`Beta(0.4,6)` 在 80% 放行率处 `E[y_death·1{release}] ≈ 1.7%` 已超 `α`，即使 `radius=0` 也不可行；
+要让上界进 `1%` 需要 `radius` 小到把经验风险压回 `α` 以下，与 H9-I4
+（`docs/PAC_SAFETY_NET.md` §3：Hoeffding + 1225 候选时 `n >= 47k`）同源。
+对 `n=4000` 的 demo：`m=1225, delta=0.1` → `radius ≈ 0.0343`，已吃掉 `α=5%` 的 2/3；
+鲁棒策略经验放行风险 `y_dod = 3.13%` 留给 `radius` 的余量只有 `1.87%`，
+因此需要 `n ≳ 1.3×10⁴` 才可能可行（若要求 `radius <= 0.5%` 则需 `n ≈ 1.9×10⁵`）。
+这就是 §5 里 `bound=hoeffding` 在 `n=4000, α=5%` 下 `feasible=False` 的原因——
+**不是策略变差，而是证据量不足**。
+
+**局限**：Hoeffding 对 `[0,1]` 有界量是**无分布**界，通常远松于经验 Bernstein / Clopper-Pearson
+（方差已知时 `sqrt(2·R·log(m/δ)/n)` 量级）；这里的半径按**最坏方差 1/4** 上界，
+所以“不可行”只能读作“**该样本量下无分布无关保证**”，不能读作“临床上一定不安全”。
+真实 `p` 到手后应换 tighter bound 或更大校准集再判。
+
 ## 4. API
 
 `domain/models/lare.py`
@@ -121,13 +157,14 @@ cost = mean( cost_fn · 1{y=1, release}
 
 | 符号 | 说明 |
 |---|---|
-| `LARPolicy(tau_low, tau_high, feasible, robust_cost, cost_dod, cost_death, n_release)` | frozen dataclass |
+| `LARPolicy(tau_low, tau_high, feasible, robust_cost, cost_dod, cost_death, n_release, risk_ub_dod=inf, risk_ub_death=inf)` | frozen dataclass；`risk_ub_*` 仅在 `bound="hoeffding"` 且可行时填入 |
 | `expected_cost(y, p, tau_low, tau_high, *, cost_fn=4.0, cost_fp=1.0, review_cost=0.2)` | 期望代价 |
-| `fit_lar_policy(p, y_dod, y_death, *, K=0.2, alpha=0.01, n_grid=50, ...)` | min-max 鲁棒选择 |
+| `fit_lar_policy(p, y_dod, y_death, *, K=0.2, alpha=0.01, n_grid=50, ..., bound="none", delta=0.1)` | min-max 鲁棒选择；`bound` ∈ {`none`,`hoeffding`} |
 | `label_specific_policies(p, y_dod, y_death, **kw)` | `{"dod": {...}, "death": {...}}` 单口径最优 |
 | `max_regret(p, y_dod, y_death, policy, **kw)` | 相对标签专属最优的最大后悔 |
 
-约定：长度不一致 / 标签非 0/1 / `K∉[0,1]` / `alpha<=0` / `n_grid<2` / 负代价 → `ValueError`；
+约定：长度不一致 / 标签非 0/1 / `K∉[0,1]` / `alpha<=0` / `n_grid<2` / 负代价 /
+`bound∉{none,hoeffding}` / `delta∉(0,1)` → `ValueError`；
 `policy_masks` 不是 dict → `TypeError`；三区重叠 → `ValueError`。
 纯函数、只依赖 `numpy`（复用 `pac_safety_net` / `lare` 的掩码口径），无 DB、无网络、无全局状态。
 
@@ -136,6 +173,7 @@ cost = mean( cost_fn · 1{y=1, release}
 ```powershell
 $env:PYTHONPATH = (Get-Location)
 .\.venv\Scripts\python.exe scripts/lare_demo.py --n 4000 --seed 0
+.\.venv\Scripts\python.exe scripts/lare_demo.py --n 4000 --seed 0 --bound hoeffding
 ```
 
 数据：`p ~ Beta(0.4, 6.0)`，`y_death ~ Bernoulli(0.15p + 0.02)`，`y_dod = build_coarse_label(..., 0.5)`。
@@ -181,6 +219,18 @@ $env:PYTHONPATH = (Get-Location)
 `E[y_death·1{release}] ≈ 1.7% > 1%`；即使粗化附加率为 0，该预算也过不了。
 这与 H9-I4 的结论同源——**1% 的放行漏检预算需要更大的校准集 / 更紧的统计界**
 （`docs/PAC_SAFETY_NET.md` §3：Hoeffding + 1225 候选时 `n >= 47k`）。
+
+**(d) 有限样本上界对照（`--bound none` vs `--bound hoeffding`，`delta=0.1`）**
+
+| bound | `tau_low` | `tau_high` | feasible | `robust_cost` | `n_release` | `max_regret` |
+|---|---:|---:|---|---:|---:|---:|
+| none（经验风险） | 0.1224 | 0.7551 | True | 0.15995 | 3301 | 0.0134 |
+| hoeffding（上界） | 0.0000 | 1.0000 | **False** | inf | 0 | 0.1035 |
+
+`n=4000, m=1225, delta=0.1` → `radius ≈ 0.0343`；鲁棒策略的经验放行风险
+`y_dod=3.13%`，加界后 `6.56% > α=5%`，于是回落到“全部进复核”
+（`max_regret` 退化为相对 `none` 策略的 0.1035）。这正说明
+**经验可行 ≠ 在 90% 置信下可行**，见 §3.1。
 
 ## 6. 局限
 
