@@ -1,8 +1,9 @@
 # LARE · LAR-Policy（标签时间歧义下的复核评估与鲁棒选阈值）
 
 > 状态：**研究原型（synthetic-only）**。不读数据库、不调 LLM、不跑 MIMIC。
-> 代码：`domain/models/lare.py` · `domain/models/lar_policy.py` · 脚本：`scripts/lare_demo.py`
-> 测试：`tests/test_lare.py` · `tests/test_lar_policy.py`
+> 代码：`domain/models/lare.py` · `domain/models/lar_policy.py`
+> 脚本：`scripts/lare_demo.py`（合成 demo） · `scripts/lare_mimic_run.py`（MIMIC 运行器 / `--smoke` 自检）
+> 测试：`tests/test_lare.py` · `tests/test_lar_policy.py` · `tests/test_lare_runner.py`
 > 关联：[LABEL_AUDIT.md](LABEL_AUDIT.md)（dod 粗化）、[PAC_SAFETY_NET.md](PAC_SAFETY_NET.md)（放行区漏检质量）、
 > [H9_SBR.md](H9_SBR.md)（复核策略）、[ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md)（H4 阈值）。
 
@@ -248,7 +249,123 @@ $env:PYTHONPATH = (Get-Location)
 6. **复核代价模型是简化的**：假定复核能纠正一切、且成本与病例无关；真实 HITL 有复核者灵敏度/特异度
    （见 `selective_review.Reviewer`），会进一步改变最优阈值。
 
-## 7. 与 conformal deferral / 现有模块的差异
+## 7. MIMIC 运行器（`scripts/lare_mimic_run.py`）
+
+合成 demo 只验证**口径**；要在真实 MIMIC 上跑「两套标签 × 四种策略 × N seeds」的网格，用运行器。
+核心管线 `run_lare_pipeline(p, y_dod, y_death, seeds)` 是**纯函数**（可单测、不读 DB），
+`--smoke` 与真实模式走**同一条**管线，只在「数据从哪来」上分叉。
+
+### 7.1 命令
+
+```powershell
+$env:PYTHONPATH = (Get-Location)
+# 1) 自检：合成数据（n=2000），不连 DB、不需要授权
+.\.venv\Scripts\python.exe scripts/lare_mimic_run.py --smoke --seeds 2
+# 2) 单测（不连 DB、不跑真实数据）
+.\.venv\Scripts\python.exe -m pytest tests/test_lare_runner.py -q
+# 3) 真实模式：必须先过 F1 门
+$env:LARE_MIMIC_ALLOW = "1"
+.\.venv\Scripts\python.exe scripts/lare_mimic_run.py --seeds 5 --hours 0,1,2,4,6
+```
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `--smoke` | off | 合成自检；**不读 DB**，写 `artifacts/lare/smoke_lare.json` |
+| `--seeds` | `5` | bootstrap 重采样次数，seed = `0..N-1` |
+| `--hours` | `0,1,2,4,6` | 真实模式的预测时刻（`hour_index`） |
+| `--model` | `artifacts/models/lgbm_mortality_12h.txt` | 打分模型；缺失 → 退出码 2 |
+| `--out` | `artifacts/lare/mimic_lare.json` | 输出 JSON（`--smoke` 默认 `smoke_lare.json`） |
+| `--K` / `--alpha` / `--delta` | `0.2` / `0.05` / `0.1` | 预算 / 放行漏检 / Hoeffding 失败概率 |
+| `--dsn` | `postgresql://icu_dev:icu_dev@127.0.0.1:5432/mimic` | 真实模式 DSN |
+| `--feat-table` / `--death-table` / `--dod-table` | `paper_feat.sample_matrix` / `paper_label.mortality_12h` / `paper_label.mortality_12h_dod` | 三张表名（见 7.2） |
+
+### 7.2 F1 门与数据契约
+
+- 真实模式**开头**总是打印 `F1-GATE: 需要 DUA/CITI 已确认`；未设置 `LARE_MIMIC_ALLOW=1`
+  → **退出码 3**：不建连接、不读 DB。此门由 hermes 任务包（TP-20261108-001）设置。
+- 表名对应：五时刻全量矩阵是 **`paper_feat.sample_matrix`**（`feat.sample_matrix` 仅 h=0），
+  两套标签是 **`paper_label.mortality_12h`**（精确）与 **`paper_label.mortality_12h_dod`**（日期级粗化，已在库）；
+  缺表时运行器以退出码 2 + `artifacts/lare/mimic_lare.error.json`（含 `reason`）结束——
+  **不自己造标签**（LARE 的既定原则：不发明、不改标签定义）。
+- 打分走 `domain.features.build.FEATURE_COLS` + 现成 LightGBM 模型（与 `domain.models.lgbm` 同口径），
+  `p` 截断到 `[0,1]`。真实模式**不在本轮执行**。
+- 退出码：`0` 成功 / `2` 输入或数据错误（含模型缺失，原因写 `*.error.json`）/ `3` F1 门未放行。
+
+### 7.3 管线定义（四种策略 + 两个 LAR 口径）
+
+每个 seed 做一次 **bootstrap 重采样**（`rng.integers(0, n, n)`；`bootstrap=False` 可关），
+在重采样上拟合/评估，所以 `summary` 是 seed 均值（`inf/nan` 跳过，`feasible_rate` 为可行比例）：
+
+| 策略 | 定义 | 依赖标签 |
+|---|---|---|
+| `fixed` | 固定双阈值 `(0.1, 0.3)`（label-free 基线） | 否 |
+| `double` | `pac_safety_net.select_double_threshold` 在**精确标签**上拟合，两套标签交叉评估 | 是 |
+| `sbr` | `selective_review.solve_sbr` 的**终端**动作表按最近邻作用到 `p`（横断面近似：horizon=1、每病例 ≤1 次复核） | 否 |
+| `deferral` | cost-aware deferral 的固定阈值近似：top-`K` 风险整体转人工（`tau_low = q_{1-K}`、`tau_high = 1`） | 否 |
+
+每个策略在两套标签下读 `review_yield_dod/death`、`missed_imminent`、`release_risk_dod/death`
+（`release_risk = max(两套)`）、`budget`（review+alert 占比）；`reviewed_jaccard` 是
+**「用 dod 拟合的复核集合」与「用 death 拟合的复核集合」的 Jaccard**——label-free 策略在两套标签下
+完全一致（恒 1.0），只有 `double` 会低于 1，用来量化口径漂移。
+
+另外每个 seed 跑 `fit_lar_policy(bound=none)` 与 `bound=hoeffding` 各一次，记录
+`tau_low / tau_high / robust_cost / max_regret / feasible`，并单独给出「标签专属阈值漂移」
+（`Δtau_low / Δtau_high / reviewed_jaccard`）。
+
+### 7.4 输出 schema
+
+```jsonc
+{
+  "config": {"mode": "smoke|mimic", "n": 2000, "seeds": [0, 1], "K": 0.2, "alpha": 0.05,
+             "n_grid": 50, "delta": 0.1, "coarse_superset_violations": 0, "hours": [0,1,2,4,6]},
+  "seeds": [{"seed": 0, "n": 2000, "base_rate_dod": 0.0682, "base_rate_death": 0.034,
+             "strategies": {"fixed|double|sbr|deferral": {"review_yield_dod": 0.0, "budget": 0.0,
+                            "reviewed_jaccard": 1.0, "n_release": 0, "tau_low": 0.0}},
+             "lar": {"none|hoeffding": {"tau_low": 0.0, "feasible": true, "robust_cost": 0.0,
+                                        "max_regret": 0.0, "risk_ub_dod": null}},
+             "label_drift": {"tau_low_dod": 0.0, "reviewed_jaccard": 0.0}}],
+  "summary": {"n_seeds": 2, "strategies": {"..seed 均值..": {}}, "lar": {}, "label_drift": {}}
+}
+```
+
+`inf/nan` 一律落成 `null`（严格 JSON，`json.dumps(..., allow_nan=False)` 可过）。
+
+### 7.5 `--smoke` 实测（n=2000, seeds=0..1, K=20%, alpha=5%, delta=0.1）
+
+| 策略 | yield_dod | yield_death | missed | release_risk | Jaccard | budget | compliance_rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| fixed | 0.1381 | 0.0560 | 0.0215 | 0.0345 | 1.0000 | 0.2157 | 0.00 |
+| double | 0.0260 | 0.0197 | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 0.00 |
+| sbr | 0.1757 | 0.0709 | 0.0225 | 0.0382 | 1.0000 | 0.1680 | 1.00 |
+| deferral | 0.1562 | 0.0575 | 0.0225 | 0.0370 | 1.0000 | 0.2000 | 1.00 |
+
+LAR：`none` 可行率 1.00（`tau_low≈0.122`、`tau_high≈0.755`、`robust_cost≈0.1846`、`max_regret≈0.0003`）；
+`hoeffding` 可行率 0.00（半径 `sqrt(log(1225/0.1)/(2·2000))≈0.0485` 吃掉 5% 的风险预算 → 回落全复核）。
+标签专属阈值漂移：`Δtau_low≈-0.0102`、`Δtau_high=0`、Jaccard≈0.903。
+
+**`double` 为何在 smoke 里退化成全复核**：`select_double_threshold` 是 **PAC/LTT** 过程（单标签
+Hoeffding + Bonferroni），n=2000 时半径 0.0485 与 `alpha=0.05` 同量级，只剩 0.0015 的风险预算
+→ 不可行 → `(0,1)` 全复核。这恰好是它相对 `fit_lar_policy(bound=none)`（经验风险）的**代价**：
+同一 alpha 下 PAC 口径需要大得多的校准集（`docs/PAC_SAFETY_NET.md` §3，约 4.7e4 行量级）；
+完整 MIMIC（单时刻 ≈9.4e4 行）半径降到 ≈0.007，`double` 才恢复可用。所以读表时把 `double`
+当「PAC 严格基线」、`lar.none` 当「经验口径」，两者不可混为一谈。
+
+### 7.6 hermes 使用说明
+
+1. **前置**：F1/DUA 确认后设置 `LARE_MIMIC_ALLOW=1`；确认 `paper_label.mortality_12h_dod` 已落库、
+   `artifacts/models/lgbm_mortality_12h.txt` 存在。
+2. **跑网格**：`python scripts/lare_mimic_run.py --seeds 5 --hours 0,1,2,4,6`，一条命令产出
+   `artifacts/lare/mimic_lare.json`（`seeds` 数组 + `summary`）。
+3. **验收判据**：退出码必须为 `0`；`summary.n_seeds == 5`；`summary.lar.none.feasible_rate` 与
+   `summary.lar.hoeffding.feasible_rate` 都要记录（翻转本身就是结论）；
+   `config.coarse_superset_violations` 应为 `0`（>0 说明 `y_dod` 不是 `y_death` 的超集，
+   需回到标签审计 `docs/LABEL_AUDIT.md`）。
+4. **失败处理**：`3` → 授权未放行（不得重试绕过）；`2` → 看
+   `artifacts/lare/mimic_lare.error.json` 的 `reason`（多为表缺失 / 连接失败 / 模型缺失），
+   修数据后重跑，不要改代码绕开。
+5. **不要**在 hermes 里调 `--K/--alpha` 来「调到可行」：那等于拿测试集选阈值，见 §6 局限 2。
+
+## 8. 与 conformal deferral / 现有模块的差异
 
 | 对象 | 差异 |
 |---|---|
@@ -258,7 +375,7 @@ $env:PYTHONPATH = (Get-Location)
 | `utility_calibrate`（H4） | H4 用单一标签 + 代价比选净收益最优阈值；LAR-Policy 把“选哪个标签”本身当成不确定性来源。 |
 | `LABEL_AUDIT`（P1） | P1 是**标签审计**（口径差异的量化），LARE 是**策略审计**（口径差异如何污染策略评估与选择）。 |
 
-## 8. 下一步
+## 9. 下一步
 
 1. **把 PAC 界搬到两套标签**：对每个候选 `(tau_low, tau_high)` 分别算
    `U_dod`、`U_death`（Bonferroni 分摊到 2×候选数），取 `max(U_dod, U_death) <= alpha` 的可行域。
