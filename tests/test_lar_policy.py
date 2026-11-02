@@ -152,3 +152,56 @@ def test_invalid_inputs_raise():
         label_specific_policies(p, y, y, unknown=1)       # 未知参数
     with pytest.raises(ValueError):
         max_regret(p, y, y, "not-a-policy")
+
+
+# 8
+def test_hoeffding_bound_infeasible_for_tiny_alpha():
+    p, y_dod, y_death = _synthetic(n=800, seed=5)
+    # 经验风险在 alpha=1e-3 下已不可行；加上 Hoeffding 半径只会更严
+    pol = fit_lar_policy(
+        p, y_dod, y_death, K=0.2, alpha=1e-3, n_grid=20, bound="hoeffding"
+    )
+    assert not pol.feasible
+    assert (pol.tau_low, pol.tau_high) == (0.0, 1.0)
+    assert math.isinf(pol.robust_cost) and math.isinf(pol.cost_dod)
+    assert math.isinf(pol.risk_ub_dod) and math.isinf(pol.risk_ub_death)
+    assert pol.n_release == 0
+
+
+# 9
+def test_hoeffding_bound_is_conservative_and_reports_upper_bounds():
+    p, y_dod, y_death = _synthetic(n=2000, seed=6)
+    kw = {"K": 0.3, "alpha": 0.1, "n_grid": 40}
+    plain = fit_lar_policy(p, y_dod, y_death, **kw)
+    bounded = fit_lar_policy(p, y_dod, y_death, bound="hoeffding", delta=0.1, **kw)
+    assert plain.feasible and bounded.feasible
+    # 经验可行的候选集包含“上界可行”的候选集 ⇒ 加界后代价不会更优
+    assert bounded.robust_cost >= plain.robust_cost - 1e-12
+    # 上界 = 经验放行风险 + Hoeffding 半径，且两套标签都不超 alpha
+    n_pairs = 40 * 39 // 2
+    radius = math.sqrt(math.log(n_pairs / 0.1) / (2 * p.size))
+    masks = double_policy(p, bounded.tau_low, bounded.tau_high)
+    for ub, labels in (
+        (bounded.risk_ub_dod, y_dod),
+        (bounded.risk_ub_death, y_death),
+    ):
+        empirical = float(np.mean((labels == 1.0) & masks["release"]))
+        assert ub == pytest.approx(empirical + radius)
+        assert ub <= 0.1 + 1e-12
+    # 未启用上界时字段保持 inf（向后兼容）
+    assert math.isinf(plain.risk_ub_dod) and math.isinf(plain.risk_ub_death)
+
+
+# 10
+def test_bound_none_matches_default_and_invalid_arguments_raise():
+    p, y_dod, y_death = _synthetic(n=1000, seed=7)
+    kw = {"K": 0.3, "alpha": 0.1, "n_grid": 30}
+    assert fit_lar_policy(p, y_dod, y_death, bound="none", **kw) == fit_lar_policy(
+        p, y_dod, y_death, **kw
+    )
+    with pytest.raises(ValueError):
+        fit_lar_policy(p, y_dod, y_death, bound="clopper-pearson", **kw)
+    with pytest.raises(ValueError):
+        fit_lar_policy(p, y_dod, y_death, bound="hoeffding", delta=1.5, **kw)
+    with pytest.raises(ValueError):
+        fit_lar_policy(p, y_dod, y_death, bound="hoeffding", delta=0.0, **kw)

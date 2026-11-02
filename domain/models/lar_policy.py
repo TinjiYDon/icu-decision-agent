@@ -26,7 +26,13 @@ LAR-Policy 的做法是 **min-max 鲁棒选择**：在同一个候选网格上�
 （复核带更宽、更保守）。无可行候选 → `feasible=False`、`(tau_low, tau_high) = (0, 1)`
 （全部进复核）、`robust_cost = inf`。
 
-纯函数、只依赖 `numpy`（复用 `domain.models.lare` 的掩码口径），不读 DB、不跑 MIMIC、无网络。
+**有限样本上界**（可选 `bound="hoeffding"`，见 `docs/LARE.md` §3.1）：候选数
+`m = n_grid(n_grid-1)/2`，`radius = sqrt(log(m/delta) / (2n))`；只有**两套标签的
+上界** `release_risk + radius` 都 `<= alpha` 的候选才算可行，`robust_cost` 仍取
+两者中较差的一个。默认 `bound="none"`（经验风险，向后兼容）。
+
+纯函数、只依赖 `numpy`（复用 `domain.models.lare` 的掩码口径与
+`domain.models.pac_safety_net.hoeffding_radius`），不读 DB、不跑 MIMIC、无网络。
 """
 
 from __future__ import annotations
@@ -36,6 +42,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from domain.models.lare import double_policy
+from domain.models.pac_safety_net import hoeffding_radius
 
 __all__ = [
     "LARPolicy",
@@ -54,6 +61,10 @@ class LARPolicy:
 
     `robust_cost = max(cost_dod, cost_death)`；不可行时三项均为 `inf`，
     `tau_low=0.0, tau_high=1.0`（全部进复核）、`n_release=0`。
+
+    `risk_ub_dod / risk_ub_death` 是选中候选的**放行区漏检上界**；仅在
+    `bound="hoeffding"` 且可行时填入 `release_risk + radius`，其余情况保持 `inf`
+    （默认 `inf` 保持向后兼容）。
     """
 
     tau_low: float
@@ -63,6 +74,8 @@ class LARPolicy:
     cost_dod: float
     cost_death: float
     n_release: int
+    risk_ub_dod: float = INF
+    risk_ub_death: float = INF
 
 
 def _validate_inputs(p, y_dod, y_death, *, K, alpha, n_grid, cost_fn, cost_fp, review_cost) -> tuple:
@@ -150,8 +163,11 @@ def expected_cost(y, p, tau_low, tau_high, *, cost_fn: float = 4.0,
 
 
 def _select(cost: np.ndarray, ok_low: np.ndarray, lows: np.ndarray, highs: np.ndarray,
-            n_release: np.ndarray) -> tuple[float, float, float, int] | None:
-    """在 `ok_low` × 上三角中取最小代价；同分取放行最多、再取更小的 tau_high。"""
+            n_release: np.ndarray) -> tuple[int, int, float] | None:
+    """在 `ok_low` × 上三角中取最小代价；同分取放行最多、再取更小的 tau_high。
+
+    返回 `(i, j, cost)`（网格下标），方便调用方再取该列的统计量。
+    """
     valid = ok_low[:, None] & (lows[:, None] < highs[None, :])
     if not valid.any():
         return None
@@ -162,7 +178,7 @@ def _select(cost: np.ndarray, ok_low: np.ndarray, lows: np.ndarray, highs: np.nd
         key = (-round(c, 12), int(n_release[i]), -float(highs[j]))
         if best_key is None or key > best_key:
             best_key = key
-            best = (float(lows[i]), float(highs[j]), c, int(n_release[i]))
+            best = (int(i), int(j), c)
     return best
 
 
@@ -173,14 +189,39 @@ def _ok_low(risks: list[np.ndarray], rel_rate: np.ndarray, K: float, alpha: floa
     return ok
 
 
+def _bound_radius(bound: str, delta: float, n: int, n_grid: int) -> float:
+    """可行性半径：`bound="none"` → 0；`"hoeffding"` → `sqrt(log(m/delta)/(2n))`。
+
+    候选数按 `m = n_grid(n_grid-1)/2`（`tau_low < tau_high` 的对数）计，
+    与 `pac_safety_net.hoeffding_radius` 同口径（union bound 分摊 `delta`）。
+    """
+    if bound not in ("none", "hoeffding"):
+        raise ValueError(f"bound 只接受 'none' / 'hoeffding'，得到 {bound!r}")
+    if bound == "none":
+        return 0.0
+    if not 0.0 < float(delta) < 1.0:
+        raise ValueError("delta 必须落在 (0, 1)")
+    n_pairs = int(n_grid) * (int(n_grid) - 1) // 2
+    return hoeffding_radius(int(n), float(delta) / float(n_pairs))
+
+
 def fit_lar_policy(p, y_dod, y_death, *, K: float = 0.2, alpha: float = 0.01,
                    n_grid: int = 50, cost_fn: float = 4.0, cost_fp: float = 1.0,
-                   review_cost: float = 0.2) -> LARPolicy:
-    """在两套标签下做 min-max 鲁棒双阈值选择，返回 `LARPolicy`。"""
+                   review_cost: float = 0.2, bound: str = "none",
+                   delta: float = 0.1) -> LARPolicy:
+    """在两套标签下做 min-max 鲁棒双阈值选择，返回 `LARPolicy`。
+
+    `bound="none"`（默认）用经验风险做可行性判断；`bound="hoeffding"` 改用
+    Hoeffding 上界 `release_risk + radius <= alpha`（两套标签都要过），
+    `radius` 由 `delta` 与候选数 `m = n_grid(n_grid-1)/2` 决定。
+    """
+    if not 0.0 < float(delta) < 1.0:
+        raise ValueError("delta 必须落在 (0, 1)")
     scores, dod, death = _validate_inputs(
         p, y_dod, y_death, K=K, alpha=alpha, n_grid=n_grid,
         cost_fn=cost_fn, cost_fp=cost_fp, review_cost=review_cost,
     )
+    radius = _bound_radius(bound, delta, scores.size, int(n_grid))
     lows = np.linspace(0.0, 1.0, int(n_grid))
     highs = np.linspace(0.0, 1.0, int(n_grid))
 
@@ -191,7 +232,9 @@ def fit_lar_policy(p, y_dod, y_death, *, K: float = 0.2, alpha: float = 0.01,
         scores, death, lows, highs, cost_fn=cost_fn, cost_fp=cost_fp, review_cost=review_cost
     )
     robust = np.maximum(c_dod, c_death)
-    ok = _ok_low([r_dod, r_death], n_rel / scores.size, K, alpha)
+    ub_dod = r_dod + radius
+    ub_death = r_death + radius
+    ok = _ok_low([ub_dod, ub_death], n_rel / scores.size, K, alpha)
     best = _select(robust, ok, lows, highs, n_rel)
     if best is None:
         return LARPolicy(
@@ -203,11 +246,13 @@ def fit_lar_policy(p, y_dod, y_death, *, K: float = 0.2, alpha: float = 0.01,
             cost_death=INF,
             n_release=0,
         )
-    low, high, _, n_release = best
+    i, j, _ = best
+    low, high, n_release = float(lows[i]), float(highs[j]), int(n_rel[i])
     cost_dod = expected_cost(dod, scores, low, high, cost_fn=cost_fn, cost_fp=cost_fp,
                              review_cost=review_cost)
     cost_death = expected_cost(death, scores, low, high, cost_fn=cost_fn, cost_fp=cost_fp,
                                review_cost=review_cost)
+    use_bound = bound == "hoeffding"
     return LARPolicy(
         tau_low=low,
         tau_high=high,
@@ -215,7 +260,9 @@ def fit_lar_policy(p, y_dod, y_death, *, K: float = 0.2, alpha: float = 0.01,
         robust_cost=float(max(cost_dod, cost_death)),
         cost_dod=float(cost_dod),
         cost_death=float(cost_death),
-        n_release=int(n_release),
+        n_release=n_release,
+        risk_ub_dod=float(ub_dod[i]) if use_bound else INF,
+        risk_ub_death=float(ub_death[i]) if use_bound else INF,
     )
 
 
@@ -258,13 +305,13 @@ def label_specific_policies(p, y_dod, y_death, **kw) -> dict:
                 "n_release": 0,
             }
         else:
-            low, high, c, n_release = best
+            i, j, c = best
             out[name] = {
-                "tau_low": low,
-                "tau_high": high,
+                "tau_low": float(lows[i]),
+                "tau_high": float(highs[j]),
                 "feasible": True,
                 "cost": float(c),
-                "n_release": int(n_release),
+                "n_release": int(n_rel[i]),
             }
     return out
 
