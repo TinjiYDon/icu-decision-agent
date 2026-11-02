@@ -1,46 +1,59 @@
-# 文档索引
+# 文档索引（icu-decision-agent）
 
-> **先读总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md)（总目标 + 总内容串线）
+> 第一入口：[TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) —— 意图与责任分离的技术总览（架构 / 创新点详解 / 调研 / 选型 / 实现路径 / 术语 / API / 索引）。
+> 旧版/被替代文档在 `docs/archive/`（保存不删）。
+
+## 1. 总览与叙事
 
 | 文档 | 内容 |
-|------|------|
-| [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | **总目标 / 总内容 / 闭环叙事（SSOT）** |
-| [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md) | **CUGEW 架构 · 新旧对比 · DEI/RWSG/SUFH 公式** |
-| [COLLABORATION.md](COLLABORATION.md) | **3 人协作主手册** |
-| [BACKLOG.md](BACKLOG.md) | 垂直切片任务（可开 Issue） |
+|---|---|
+| [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) | **技术总览（主入口）** |
+| [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | 总目标 · 总内容（SSOT） |
+| [STATUS.md](STATUS.md) | 进度与指标 |
+| [ROADMAP.md](ROADMAP.md) / [CHANGELOG.md](CHANGELOG.md) | 计划 / 变更记录 |
+
+## 2. 创新与调研
+
+| 文档 | 内容 |
+|---|---|
+| [LARE.md](LARE.md) | **LARE / LAR-Policy / Hoeffding 上界 / MIMIC 运行器** |
+| [INNOVATION_PORTFOLIO.md](INNOVATION_PORTFOLIO.md) | 创新点集合与可主张性 |
+| [LABEL_AUDIT.md](LABEL_AUDIT.md) | P1 标签时间精度审计（证据底座） |
+| [H9_SBR.md](H9_SBR.md) / [PAC_SAFETY_NET.md](PAC_SAFETY_NET.md) | 工程基线（不主张算法创新） |
+| [SOTA_SURVEY.md](SOTA_SURVEY.md) / [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) | 对标 / 学术纲领 |
+| [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | 答辩口径 |
+
+## 3. 架构与公式
+
+| 文档 | 内容 |
+|---|---|
+| [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md) | 新旧架构与公式 |
+| [TECH_DESIGN_SHAP_LLM.md](TECH_DESIGN_SHAP_LLM.md) | 解释链设计 |
+| [PARAM_STORY.md](PARAM_STORY.md) / [EXPLAIN_QUALITY_IMPROVEMENT_PLAN.md](EXPLAIN_QUALITY_IMPROVEMENT_PLAN.md) | 参数 / 解释质量改造 |
+
+## 4. 实验与数据
+
+| 文档 | 内容 |
+|---|---|
+| [DATA_LOCAL.md](DATA_LOCAL.md) / [DUMP_READY.md](DUMP_READY.md) | 数据约定 / dump 恢复 |
+| [BASELINE_EXPERIMENT.md](BASELINE_EXPERIMENT.md) / [D1_OPTIMIZATION_SUMMARY.md](D1_OPTIMIZATION_SUMMARY.md) | 基线与解释评测 |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) / [TUNING_LOCAL.md](TUNING_LOCAL.md) | 演示与启动 |
+
+## 5. 协作与工程
+
+| 文档 | 内容 |
+|---|---|
+| [COLLABORATION.md](COLLABORATION.md) | 3 人协作主手册 |
 | [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | 架构、流程、命令 |
-| [DATA_LOCAL.md](DATA_LOCAL.md) | MIMIC / dump |
-| [STATUS.md](STATUS.md) | 当前进度与指标 |
-| [ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) | **痛点/约束/H1–H5 学术纲领** |
-| [TEACHER_INNOVATION.md](TEACHER_INNOVATION.md) | 老师答辩口径 |
-| [TEAM_DIRECTION.md](TEAM_DIRECTION.md) | 组员方向同步 |
-| [INTEGRATION_PREP.md](INTEGRATION_PREP.md) | 代码整合准备清单 |
-| [PROGRESS.md](PROGRESS.md) | 里程碑完成度（人/AI） |
-| [CHANGELOG.md](CHANGELOG.md) | 本仓变更与 Release |
-| [ROADMAP.md](ROADMAP.md) | 下一版本目标 |
-| [DUMP_READY.md](DUMP_READY.md) | **线下 dump 单发 / restore**（含特征口径） |
-| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | **答辩演示口播** |
-| [TUNING_LOCAL.md](TUNING_LOCAL.md) | Streamlit 监测台启动 / 常见问题 |
-| [TOP_TIER_NEXT.md](TOP_TIER_NEXT.md) | 下一步优化建议 |
-| [INNOVATION_ROADMAP.md](INNOVATION_ROADMAP.md) | 里程碑 |
-| [H9_SBR.md](H9_SBR.md) | **H9 选择性复核（预算约束序贯停止）原型** |
-| [PAC_SAFETY_NET.md](PAC_SAFETY_NET.md) | **H9-I4 PAC 双阈值安全网（放行区漏检的有限样本保证）** |
-| [LARE.md](LARE.md) | **LARE / LAR-Policy：标签时间歧义下的复核评估 + min-max 鲁棒双阈值** |
-| [INNOVATION_PORTFOLIO.md](INNOVATION_PORTFOLIO.md) | **创新点集合（全部创新点 + 可主张性）** |
-| [TECH_REPORT_H9.md](TECH_REPORT_H9.md) | **H9 技术文档（函数/公式/架构/方法论）** |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | PR 规范 |
+| [TEAM_DIRECTION.md](TEAM_DIRECTION.md) / [INTEGRATION_PREP.md](INTEGRATION_PREP.md) / [PROGRESS.md](PROGRESS.md) | 分工与里程碑 |
+| [MERGE_GATE.md](MERGE_GATE.md) / [BUGBOT.md](BUGBOT.md) / [CONTRIBUTING.md](../CONTRIBUTING.md) | 工程规范 |
+| ADR | [001-layer-boundaries.md](adr/001-layer-boundaries.md) |
 
-## ADR
+## 6. 归档（保存不删）
 
-- [001-layer-boundaries.md](adr/001-layer-boundaries.md)
+`docs/archive/`：报告稿旧版、日期戳进度报告等被替代文档。
 
-## 角色速查
-
-| 成员 | 角色 |
-|------|------|
-| A | 数据/基础设施 |
-| B | 算法 |
-| C | 应用/集成负责人 |
+## 角色速查：A 数据/基础设施 · B 算法 · C 应用/集成负责人
 
 ## 数据检查点
 
