@@ -1,5 +1,22 @@
 # 项目状态
 
+> 更新：2026-11-03 · **当前主线：LARE / LAR-Policy**（标签时间歧义下的复核评估）· 阶段 S4
+> **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · 人话版：[BRIEF.md](BRIEF.md) · 技术总览：[TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md)
+
+## 2026-11-03 更新（当前结论）
+
+| 项 | 结果 |
+|---|---|
+| 主创新 | LARE：同一策略两套标签下 yield 差 +0.0839、复核名单 Jaccard 0.2429（MIMIC） |
+| 第二点 | LAR-Policy：MIMIC robust_cost 0.0708、max_regret 0.0039 |
+| 边界 | Hoeffding：n=4000/α=5% 不可行；α=1% 需 n≈47k |
+| 已撤回 | H6 CUGEW（三指数共线、SUFH 4/18,891）；H5 反降；H4 NB 仍负 |
+| 证据 | `artifacts/lare/mimic_lare.json`、`docs/LARE.md`、`docs/LABEL_AUDIT.md` |
+| K 口径 | K=0.2：fixed/sbr 预算 0.321 超限（不合规），double 退化为全放行；K=0.35：合规，robust_cost 0.0706、max_regret 0.0040、drift Jaccard 0.2405（`mimic_lare_k035.json`） |
+| 阶段 | S4（成稿）；门禁 `preflight.yaml` |
+
+> 以下为 2026-10-09 的历史状态，保留供追溯；与上表冲突时以 2026-11-03 为准。
+
 > 更新：2026-10-09 · **独立 CDSS** · DX-1/2/3 + **H4/H5** · 主指标 PR-AUC / Brier / DCA/NB  
 > **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · 假设细节：[ACADEMIC_THESIS.md](ACADEMIC_THESIS.md) · 老师口径：[TEACHER_INNOVATION.md](TEACHER_INNOVATION.md)  
 > **叙事**：机制创新（效用阈值 + 稀疏融合）+ 人机协同；**不**耦合 scheduling

@@ -65,9 +65,9 @@ def render_innovation() -> None:
                     "对老师怎么说": "训练—阈值环对准临床代价",
                 },
                 {
-                    "层": "H6 CUGEW（主创新）",
+                    "层": "H6 CUGEW（已撤回：负结果）",
                     "是什么": "DEI/ANB/UEI + RWSG + SUFH",
-                    "对老师怎么说": "新指数 + 近因门控算法 + 可训练融合头",
+                    "对老师怎么说": "已撤回：三指数共线、SUFH 退化，不作为卖点",
                 },
                 {
                     "层": "H3 解释可信",
@@ -80,12 +80,19 @@ def render_innovation() -> None:
         hide_index=True,
     )
 
-    st.header("H6 CUGEW（请重点讲）")
+    st.header("当前主线：LARE / LAR-Policy（2026-11）")
+    st.markdown(
+        "标签时间歧义：`dod` 是 `deathtime` 的粗化超集（dod-only 5,401，48.9%）。"
+        "同一复核策略在两套标签下会被评成不同好坏；LARE 做评估，LAR-Policy 做 min-max 鲁棒选阈值。"
+    )
+    st.caption("详见 docs/LARE.md；H6 已撤回，仅保留为负结果。")
+
+    st.header("H6 CUGEW（已撤回：负结果，仅供参考）")
     if H6_JSON.is_file():
         h6 = json.loads(H6_JSON.read_text(encoding="utf-8"))
         st.caption(h6.get("note", ""))
         st.dataframe(pd.DataFrame(h6.get("rows", [])), use_container_width=True, hide_index=True)
-        st.success(f"主比较指数 UEI 最优策略：**{h6.get('best_by_UEI')}**")
+        st.warning("H6 已撤回：三指数共线、SUFH 在 18,891 行只报 4 行；不作为创新主张。")
         st.latex(r"\mathrm{UEI}=\mathrm{DEI}\cdot(1-\mathrm{AlertRate})")
         st.latex(
             r"p^{\mathrm{rw}}=\sum_{h'\le h}e^{-\beta(h-h')}p_{h'}/Z,\quad "
