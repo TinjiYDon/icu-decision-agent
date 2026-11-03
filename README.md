@@ -6,7 +6,7 @@
 
 **架构与公式**：[`docs/ARCHITECTURE_MATH.md`](docs/ARCHITECTURE_MATH.md) — 创新架构、新旧对比、H4/H5 数学定义  
 
-**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/BACKLOG.md`](docs/BACKLOG.md)
+**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## 快速开始
 

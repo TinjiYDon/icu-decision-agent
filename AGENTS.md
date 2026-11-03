@@ -56,3 +56,7 @@ Streamlit 只调 L4；禁止页面内 SQL / 直接 import domain（见 `docs/adr
 ## 数据
 
 dump/artifacts **不入 Git**。
+
+## 复杂项目协议
+
+多阶段/跨仓库任务先读 `docs/STAGE.md`；对外文档写 `docs/BRIEF.md`（L0/L1/L2/L3/L4 分层）；派单前跑 `python ~/.dsh/skills/complex-project-harness/scripts/preflight.py --config preflight.yaml`；任务包含 FACTS + ACCEPTANCE；实现顺序红测试→smoke→全量。
