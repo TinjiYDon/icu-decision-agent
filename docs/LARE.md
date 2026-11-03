@@ -1,6 +1,6 @@
 # LARE · LAR-Policy（标签时间歧义下的复核评估与鲁棒选阈值）
 
-> 状态：**研究原型（synthetic-only）**。不读数据库、不调 LLM、不跑 MIMIC。
+> 状态：**研究原型 + MIMIC 运行器**。默认 demo 为合成数据；真实模式需 `LARE_MIMIC_ALLOW=1`（F1 已确认），读 `paper_feat/paper_label`，不调 LLM。
 > 代码：`domain/models/lare.py` · `domain/models/lar_policy.py`
 > 脚本：`scripts/lare_demo.py`（合成 demo） · `scripts/lare_mimic_run.py`（MIMIC 运行器 / `--smoke` 自检）
 > 测试：`tests/test_lare.py` · `tests/test_lar_policy.py` · `tests/test_lare_runner.py`

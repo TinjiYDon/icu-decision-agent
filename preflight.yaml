@@ -1,0 +1,34 @@
+repo: C:\Users\lenovo\Desktop\decision shcedule\icu-decision-agent
+
+files:
+  - docs/TECHNICAL_OVERVIEW.md
+  - docs/LARE.md
+  - docs/BRIEF.md
+  - domain/models/lare.py
+  - domain/models/lar_policy.py
+  - artifacts/models/lgbm_mortality_12h.txt
+
+python: .venv\Scripts\python.exe
+
+modules:
+  - numpy
+  - lightgbm
+  - psycopg
+  - yaml
+
+db:
+  dsn: postgresql://icu_dev:icu_dev@127.0.0.1:5432/icu_decision
+  tables:
+    - name: paper_feat.sample_matrix
+      columns: [stay_id, hour_index, feature_json]
+      min_rows: 1000
+    - name: paper_label.mortality_12h
+      columns: [stay_id, hour_index, label]
+      min_rows: 1000
+    - name: paper_label.mortality_12h_dod
+      columns: [stay_id, hour_index, label]
+      min_rows: 1000
+
+commands:
+  - git
+  - python
