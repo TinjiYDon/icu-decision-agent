@@ -9,6 +9,7 @@
 |---|---|
 | [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) | **技术总览（主入口）** |
 | [STAGE.md](STAGE.md) | 阶段门禁 S0–S4（当前 S4） |
+| [RESEARCH_PLAN.md](RESEARCH_PLAN.md) | **总目标 / 架构 / 下一步目标与验收（2026-11-11）** |
 | [BRIEF.md](BRIEF.md) | 人话版解释（分诊台类比 + 五步链路） |
 | [MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) | 总目标 · 总内容（SSOT） |
 | [STATUS.md](STATUS.md) | 进度与指标 |
