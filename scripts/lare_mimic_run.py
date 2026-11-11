@@ -82,6 +82,9 @@ N_GRID = 50
 
 FIXED_TAU_LOW = 0.1
 FIXED_TAU_HIGH = 0.3
+# D0: double 必须用掉至少 80% 的复核预算；也不能把所有人都塞进复核（>120% K）
+MIN_REVIEW_RATIO = 0.8
+MAX_REVIEW_RATIO = 1.2
 
 STRATEGIES = ("fixed", "double", "sbr", "deferral")
 LABEL_FREE = frozenset({"fixed", "sbr", "deferral"})
@@ -102,6 +105,8 @@ STRATEGY_METRICS = (
     "release_risk_death",
     "reviewed_jaccard",
     "budget",
+    "conditional_miss_rate_dod",
+    "conditional_miss_rate_death",
 )
 
 
@@ -240,13 +245,38 @@ def strategy_masks(name: str, p: np.ndarray, y_fit: np.ndarray, *,
             p, y_fit, alpha=float(alpha), delta=float(delta),
             n_low=int(n_grid), n_high=int(n_grid),
         )
-        masks = double_policy(p, res.tau_low, res.tau_high)
-        meta = {
-            "tau_low": float(res.tau_low),
-            "tau_high": float(res.tau_high),
-            "feasible": bool(res.feasible),
-            "risk_upper_bound": _json_number(res.risk_upper_bound),
-        }
+        n = max(int(len(p)), 1)
+        used = (int(res.n_review) + int(res.n_alert)) / n
+        degenerate = (
+            (not res.feasible)
+            or used < MIN_REVIEW_RATIO * float(K)
+            or used > MAX_REVIEW_RATIO * float(K)
+        )
+        if degenerate:
+            # 全放行/几乎全放行：改用“同预算 top-K 复核”兜底，保证名额被用掉。
+            tau_low = float(np.quantile(p, 1.0 - float(K)))
+            tau_high = 1.0
+            masks = double_policy(p, tau_low, tau_high)
+            meta = {
+                "tau_low": tau_low,
+                "tau_high": tau_high,
+                "feasible": False,
+                "risk_upper_bound": _json_number(res.risk_upper_bound),
+                "degenerate": True,
+                "fallback": "budgeted_topk",
+                "selected_release_rate": float(res.n_release) / n,
+            }
+        else:
+            masks = double_policy(p, res.tau_low, res.tau_high)
+            meta = {
+                "tau_low": float(res.tau_low),
+                "tau_high": float(res.tau_high),
+                "feasible": bool(res.feasible),
+                "risk_upper_bound": _json_number(res.risk_upper_bound),
+                "degenerate": False,
+                "fallback": None,
+                "selected_release_rate": float(res.n_release) / n,
+            }
     elif name == "sbr":
         masks = _sbr_masks(p)
         meta = {"review_slots": SBR_BUDGET}
@@ -289,6 +319,9 @@ def _strategy_row(name: str, p, dod, death, *, K, alpha, n_grid, delta) -> dict:
         "compliance": bool(ev["compliance"]),
         "label_free": name in LABEL_FREE,
     }
+    release_rate = float(ev["n_release"]) / max(int(len(p)), 1)
+    row["conditional_miss_rate_dod"] = risk_dod / max(release_rate, 1e-12)
+    row["conditional_miss_rate_death"] = risk_death / max(release_rate, 1e-12)
     row.update(meta)
     return row
 
@@ -416,6 +449,12 @@ def run_lare_pipeline(
                 "n_alert": _mean(r["strategies"][name]["n_alert"] for r in rows),
                 "compliance_rate": _mean(
                     1.0 if r["strategies"][name]["compliance"] else 0.0 for r in rows
+                ),
+                "degenerate_rate": _mean(
+                    1.0 if r["strategies"][name].get("degenerate") else 0.0 for r in rows
+                ),
+                "fallback_rate": _mean(
+                    1.0 if r["strategies"][name].get("fallback") else 0.0 for r in rows
                 ),
             }
             for name in STRATEGIES
