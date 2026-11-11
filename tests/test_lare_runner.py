@@ -142,9 +142,9 @@ def test_strategy_masks_partition_and_double_feasible_path():
         assert np.all(release | review | alert)
         assert isinstance(meta, dict)
 
-    # 宽松 alpha：PAC 双阈值可行，且阈值确实来自 select_double_threshold
+    # 宽松 alpha：要么 PAC 双阈值可行，要么被 D0 判为 degenerate 并回退
     _, meta = strategy_masks("double", p, y_death, K=0.2, alpha=0.5, n_grid=50, delta=0.1)
-    assert meta["feasible"] is True
+    assert meta["feasible"] is True or meta["degenerate"] is True
     assert 0.0 <= meta["tau_low"] < meta["tau_high"] <= 1.0
 
     # deferral 的复核占比 ≈ 预算 K
@@ -162,6 +162,20 @@ def test_smoke_cli_writes_artifact(tmp_path):
     assert payload["config"]["hours"] == [0, 1, 2, 4, 6]
     assert "summary" in payload and "seeds" in payload
     assert set(payload["summary"]["strategies"]) == set(STRATEGIES)
+
+
+# 9
+def test_double_degenerate_falls_back_to_budgeted_topk():
+    """alpha 很宽时 LTT 会选全放行；D0 必须改用同预算 top-K，不能标 compliant 了事。"""
+    p, y_dod, y_death = make_smoke_dataset(n=2000, seed=0)
+    masks, meta = strategy_masks(
+        "double", p, y_death, K=0.2, alpha=0.5, n_grid=20, delta=0.1
+    )
+    review_or_alert = masks["review"] | masks["alert"]
+    assert meta["degenerate"] is True
+    assert meta["fallback"] == "budgeted_topk"
+    # 预算下限：至少用掉 80% 的 K
+    assert review_or_alert.mean() >= 0.8 * 0.2 - 0.02
 
 
 # 8
