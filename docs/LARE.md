@@ -385,3 +385,56 @@ Hoeffding + Bonferroni），n=2000 时半径 0.0485 与 `alpha=0.05` 同量级�
    `add_rate(p)`（按风险分层），替换 demo 里的线性假设。
 4. **与 P1 alert-budget 联合**：把 `n_alert/n <= B` 加进候选筛选，一次解出
    “放行漏检 × 报警预算 × 标签歧义”的三方约束。
+
+## 10. ε-最优策略集 API（`domain/models/policy_set.py`）
+
+`fit_lar_policy` 返回**唯一**的 `(tau_low, tau_high)`，但有限样本上最优候选与邻域的
+`robust_cost` 差异常小于抽样噪声——"唯一最优"不可识别，汇报时容易把噪声当结论。
+`policy_set` 把选择结果从**单点**扩展为**ε-最优集合**（Rashomon set 口径）：
+
+    S(ε) = { θ : feasible(θ) 且 robust_cost(θ) <= min_θ robust_cost(θ) + ε }
+
+口径与 `lar_policy` **完全一致**（同网格、同代价公式、同约束、同三区定义），纯函数、只依赖
+`numpy`（复用 `lare.double_policy` 重建掩码），不读 DB、不跑 MIMIC、无随机性。
+
+### 10.1 三个函数
+
+| 函数 | 作用 | 关键契约 |
+|---|---|---|
+| `enumerate_policies(p, y_dod, y_death, *, n_grid=50, K=0.2, alpha=0.05, cost_fn=4.0, cost_fp=1.0, review_cost=0.2)` | 枚举网格 `lows=highs=linspace(0,1,n_grid)` 上 `tau_low < tau_high` 的全部 `n_grid(n_grid-1)/2` 个候选 | 每条记录键固定：`tau_low,tau_high,cost_dod,cost_death,robust_cost(=max),risk_dod,risk_death,budget,n_release,feasible`；顺序 = `tau_low` 外层升序、`tau_high` 内层升序 |
+| `epsilon_optimal(records, epsilon)` | 只在 `feasible=True` 中取 `robust_cost <= opt + ε`（`opt = min(robust_cost)`） | 保输入顺序；无可行记录 → `[]`（不可行本身是结论）；`ε<0` 或非有限 → `ValueError`；**不给默认 ε** |
+| `summarize_set(p, policies, *, include_rates=True, max_rate_n=10000)` | 集合摘要 | `n_policies, tau_low_min/max, tau_high_min/max, robust_cost_min/max, n_release_min/max`；`include_rates` 且 `len(p) <= max_rate_n` 时额外给 `consensus_rate = mean(∩ review_k)`、`contested_rate = |∪-∩| / |∪|`，否则这两个键为 `None`（不做、不假装做了） |
+
+`budget = mean(review|alert) = P(p >= tau_low)`；`risk_* = mean(y=1 且 release)`
+（全人群口径的放行区漏检质量）；`feasible = budget<=K 且 risk_dod<=alpha 且 risk_death<=alpha`（容差 `1e-12`）。
+
+### 10.2 怎么读摘要
+
+- `robust_cost_max - robust_cost_min <= ε`：集合定义的自校验（也写在单测里）。
+- `tau_low_max - tau_low_min` **大** → 阈值怎么挪代价都差不多，**别把某条阈值当唯一解**；
+  反过来**小**（集合退化到单点）→ 结论对阈值敏感，需要更多样本/更强约束再说。
+- `consensus_rate` 高 → 集合内对"谁来复核"共识强，可直接取交集作为**安全复核集**；
+  `contested_rate` 高（如示例 seed=0 的 `0.848`）→ 集合内部只对少数人达成一致，
+  这部分人属于"口径分歧带"，应作为人审优先项而不是部署依据。
+- 两个 rate 需要逐策略重建掩码（`O(len(p)·n_policies)`），大样本时用 `include_rates=False`
+  或压低 `max_rate_n`，取值不参与任何约束判定。
+
+### 10.3 用法与坑
+
+```python
+from domain.models.policy_set import enumerate_policies, epsilon_optimal, summarize_set
+
+records = enumerate_policies(p, y_dod, y_death, n_grid=50, K=0.2, alpha=0.05)
+chosen = epsilon_optimal(records, 0.004)          # ε 由调用方决定，模块不给默认值
+summary = summarize_set(p, chosen)                # 阈值/代价/人数区间 + 共识/争议
+```
+
+1. **ε 是代价绝对差**（与 `robust_cost` 同量纲），不是相对比例；`0.004` 只是示例口径，
+   换数据集必须重议（与 `cost_fn/cost_fp/review_cost` 的量纲绑定）。
+2. **不要在测试集上扫 ε 挑好看的集合**：ε 属于评估口径，应在校准集上固定，理由同 §6 局限 2。
+3. **候选数**：`n_grid=50` → 1225 条记录；`n_grid=200` → 19900 条，逐候选记录是 Python
+   级 dict，注意内存。阈值统计用前缀和（每个阈值 `O(log n)`），不做 `O(n·m)` 掩码。
+4. **与 `fit_lar_policy` 的关系**：选中点必然在同一网格上且属于 `S(ε)`（单测
+   `test_selected_point_belongs_to_epsilon_set` 守着这条跨模块一致性）；本模块**不改**
+   `lar_policy` / `lare`，也不提供 `bound="hoeffding"` 的 ε 集合（后续工作：把 PAC 上界
+   并入可行性判定）。
