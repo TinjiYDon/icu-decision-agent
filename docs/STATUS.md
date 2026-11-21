@@ -1,6 +1,8 @@
-# 项目状态
+# 项目状态（历史快照 · 请以 `METRICS_LEDGER.md` 为准）
 
-> 更新：2026-11-03 · **当前主线：LARE / LAR-Policy**（标签时间歧义下的复核评估）· 阶段 S4
+> **⚠️ 2026-11-21 阶段 0 提示**：本文件保留 11 月 3 日及 10 月 9 日的历史状态供溯源；最新 V3 进展、四套历史口径作废说明与正式指标槽位请统一查阅 **[METRICS_LEDGER.md](METRICS_LEDGER.md)**、**[STAGE.md](STAGE.md)** 与 **[OPTIMIZATION_SPEC.md](OPTIMIZATION_SPEC.md)**。
+
+> 更新：2026-11-03 · **历史主线：LARE / LAR-Policy**（标签时间歧义下的复核评估）· 阶段 S4
 > **总纲领**：[MASTER_NARRATIVE.md](MASTER_NARRATIVE.md) · 人话版：[BRIEF.md](BRIEF.md) · 技术总览：[TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md)
 
 ## 2026-11-03 更新（当前结论）

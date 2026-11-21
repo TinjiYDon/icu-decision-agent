@@ -1,12 +1,23 @@
-# ICU 临床恶化预警决策智能体
+# ICU 临床恶化预警与人机协同决策智能体（icu-decision-agent）
 
-独立开源项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
+独立开源研究与工程项目 · 3 人协作 · 仓库 [icu-decision-agent](https://github.com/TinjiYDon/icu-decision-agent)
 
-**总纲领（先读）**：[`docs/MASTER_NARRATIVE.md`](docs/MASTER_NARRATIVE.md) — 总目标与总内容如何串成一条线  
+- **V3 优化规范与公式（先读 · SSOT）**：[`docs/OPTIMIZATION_SPEC.md`](docs/OPTIMIZATION_SPEC.md)
+- **阶段 0–5 全流程行动清单**：[`docs/ACTION_CHECKLIST.md`](docs/ACTION_CHECKLIST.md)
+- **唯一实验指标台账**：[`docs/METRICS_LEDGER.md`](docs/METRICS_LEDGER.md)
+- **阶段门禁与文档总索引**：[`docs/STAGE.md`](docs/STAGE.md) · [`docs/README.md`](docs/README.md) · [`docs/COLLABORATION.md`](docs/COLLABORATION.md)
 
-**架构与公式**：[`docs/ARCHITECTURE_MATH.md`](docs/ARCHITECTURE_MATH.md) — 创新架构、新旧对比、H4/H5 数学定义  
+## 当前技术主线（2026-11-21 中期后 V3 架构）
 
-**协作入口**：[`docs/COLLABORATION.md`](docs/COLLABORATION.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md)
+```text
+MIMIC-IV v3.1（storetime <= t · 在院存活过滤 · subject_id 患者级切分 · 精确 deathtime）
+  → LightGBM 事件级目标消融（M0 强基线 → M1 事件/提前量加权 → M2a 事件级 LSE+BCE 自定义 fobj）+ 概率校准
+  → 状态依赖动态复核队列（预算 K · D0 静态直选 / D1 静默排重 / D2 跃升再报 / D2-Dual 三区动作）
+  → 同源时间粗化（LARE 1h/6h/12h/日级）+ 多自由度 ε-近优名单稳定性与归因
+  → Streamlit 软著原型（SHAP→RAG→LLM 解释 · 带时间/来源的事实纠正与 VoI 留痕）
+```
+
+> 历史淘汰文档（旧 H4/H5/H6 CUGEW 及 7–10 月旧计划）已归档至 [`docs/archive/`](docs/archive/)。
 
 ## 快速开始
 
@@ -17,56 +28,30 @@ copy configs\database.yaml.example configs\database.yaml
 copy configs\data.yaml.example configs\data.yaml
 .\scripts\apply_migrations.ps1
 $env:PYTHONPATH = (Get-Location)
-.\scripts\run_data_pipeline.ps1   # 数据检查点：ETL + dump + 冒烟
+# 运行无 DB 核心单测
+.\.venv\Scripts\python.exe -m pytest tests/test_lare.py tests/test_lar_policy.py tests/test_lare_runner.py tests/test_policy_set.py tests/test_time_coarsening.py tests/test_selective_review.py tests/test_pac_safety_net.py tests/test_features_leak.py tests/test_smoke.py tests/test_dca.py -q
 ```
 
-## 文档
+## 文档导航
 
 | 文档 | 说明 |
-|------|------|
-| [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 架构、流程、命令 |
-| [docs/DUMP_READY.md](docs/DUMP_READY.md) | **线下 dump 单发** |
-| [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Plotly 监测台 |
-| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | **答辩演示口播** |
-| [docs/STATUS.md](docs/STATUS.md) | 当前进度与指标 |
-| [docs/TEAM_DIRECTION.md](docs/TEAM_DIRECTION.md) | **组员方向同步（必读）** |
-| [docs/PROGRESS.md](docs/PROGRESS.md) | 里程碑完成度 |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 本仓变更 / Release |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 下一版本 |
-| [docs/README.md](docs/README.md) | 文档索引 |
+| :--- | :--- |
+| [docs/OPTIMIZATION_SPEC.md](docs/OPTIMIZATION_SPEC.md) | **V3 优化说明、痛点诊断与三大支柱算法公式** |
+| [docs/ACTION_CHECKLIST.md](docs/ACTION_CHECKLIST.md) | **阶段 0–5 行动清单、分工矩阵与 Gate 门控** |
+| [docs/METRICS_LEDGER.md](docs/METRICS_LEDGER.md) | **唯一实验指标台账（区分作废口径与 V3 正式口径）** |
+| [docs/STAGE.md](docs/STAGE.md) | 阶段门禁与演进记录 |
+| [docs/LARE.md](docs/LARE.md) / [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md) | LARE / LAR-Policy 技术细节与模块索引 |
+| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) / [docs/TUNING_LOCAL.md](docs/TUNING_LOCAL.md) | Streamlit 原型演示与启动 |
+| [docs/DUMP_READY.md](docs/DUMP_READY.md) / [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | 数据恢复、工程结构与命令 |
+| [docs/README.md](docs/README.md) | 完整文档索引与归档说明 |
 
-**主线**：解释链（SHAP→RAG→LLM）已合入；2026-09-13 起独立 CDSS 深挖见 [`docs/TEAM_DIRECTION.md`](docs/TEAM_DIRECTION.md)。
-
-## 答辩演示
+## 控制台与 Docker
 
 ```powershell
-.\scripts\run_console.ps1
-```
-
-口播步骤见 [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：项目总览 → 监测高低风险 → 验收校准/净受益。
-
-演示前请 restore S2 dump（见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)）。**勿**在 restore 后再跑会清空 `feat` 的 P0 ETL。监测台主信号为年龄+化验；chart 生命体征在 dump 中多为缺测。
-
-## 架构
-
-```
-MIMIC (Layer0) → ETL → staging/feat → LightGBM + SHAP → Streamlit
-```
-
-## Docker（可选）
-
-```powershell
-docker compose up -d   # PostgreSQL 端口 5433
-```
-
-## 模型与演示
-
-```powershell
+docker compose up -d   # PostgreSQL 端口 5433（可选）
 $env:PYTHONPATH = (Get-Location)
-# 有 S2 dump 时（推荐）:
 .\.venv\Scripts\python.exe -m application.train --from-existing
 .\scripts\run_console.ps1
 ```
 
-线下 dump：见 [`docs/DUMP_READY.md`](docs/DUMP_READY.md)（**不入 Git**）。监测台页面：项目 / 监测 / 调参 / 验收。
-
+线下 dump 与 `artifacts/` **不入 Git**，遵守 [`docs/adr/001-layer-boundaries.md`](docs/adr/001-layer-boundaries.md) 分层边界。

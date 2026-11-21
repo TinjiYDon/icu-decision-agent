@@ -1,97 +1,41 @@
-# 总纲领 · 一条线串起全仓（2026-11-03）
+# 总纲领 · 一条线串起全仓（2026-11-21 · V3 升级版）
 
-> SSOT 叙事入口。读完应能回答：项目做什么、主创新是什么、证据在哪、哪些不主张。
-> 阶段门禁 → [STAGE.md](STAGE.md)；人话版 → [BRIEF.md](BRIEF.md)；完整技术说明 → [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md)；数字 → [STATUS.md](STATUS.md)。
+> **详细公式与技术规范** → [OPTIMIZATION_SPEC.md](OPTIMIZATION_SPEC.md)  
+> **阶段 0–5 行动清单** → [ACTION_CHECKLIST.md](ACTION_CHECKLIST.md) · **唯一数字台账** → [METRICS_LEDGER.md](METRICS_LEDGER.md) · **阶段门禁** → [STAGE.md](STAGE.md)
 
 ---
 
 ## 1. 总目标（North Star）
 
-> 在时间因果约束下，为 ICU 入科后 0/1/2/4/6 小时提供“可决策、可解释、可人审”的 12 小时恶化预警；**先把标签语义讲清楚，再谈复核策略好坏**。
+> 在严格时间因果（化验 `storetime <= t` · 在院存活过滤 · `subject_id` 患者级切分）下，为 ICU 入科早期提供**事件级目标可优化、有限预算队列可动态决策、标签时间精度可稳健归因、解释与事实纠正可人审留痕**的 12 小时院内死亡预警决策系统。
 
-**当前主创新（S3–S4）**
+### 三大核心支柱（正面回应中期导师三问）
 
-| ID | 主张 | 一句话 |
-|---|---|---|
-| D-B | 标签时间精度审计 | `dod` 是 `deathtime` 的粗化超集（dod-only 5,401，48.9%），会改变阈值、排名与预算合规 |
-| D-M1 | **LARE** | 同一复核策略在两套标签下评估：yield 差 +0.0839、复核名单 Jaccard 0.2446（合成）/0.2429（MIMIC） |
-| D-M2 | LAR-Policy | 对两套标签做 min-max 的鲁棒双阈值：robust_cost 0.15995 / max_regret 0.0134（合成）；0.0708 / 0.0039（MIMIC） |
-| D-M3 | Hoeffding 上界（可选） | 数据不够时不允许说“可行”：n=4000/α=5% 直接不可行 |
+| 支柱 | 回应痛点 | 核心机制 |
+| :--- | :--- | :--- |
+| **支柱一：状态依赖动态复核队列** | 只做了预警，决策还没做 | 维护患者历史提醒状态 $\mathbf{z}_{s,h}=(I,\tau^{\mathrm{last}},p^{\mathrm{last}})$，在有限预算 $K$ 下对比 D0（直选）/ D1（静默排重）/ D2（跃升再报）/ D2-Dual，统一以**独立事件首次覆盖率、提前时长与 Event-NNR** 评价 |
+| **支柱二：LightGBM 事件级目标改写** | LightGBM 只是调包 | **M0（无权重强基线）→ M1（事件/提前量归一）→ M2a（事件级 Smooth-Max + BCE 自定义 `fobj`，解析梯度 $g$ + 严格正定凸 MM 海森 $h$）** + 开发集概率校准 |
+| **支柱三：同源粗化 LARE + $\varepsilon$-近优归因** | 公式改进与创新点不够清晰 | 在多自由度决策空间上做 1h/6h/12h/日级同源粗化与同翻转率随机对照，用 $\varepsilon$-近优策略集划分共识/争议复核集，以 $D_{\mathrm{cross}}$ vs $D_{\mathrm{within}}$ 严格分离标签粗化与近优多重性 |
 
-**明确不主张**：H4 净受益仍为负（−0.0354）；H5 PR-AUC 反降（0.1637→0.1528）；H6 CUGEW 已撤回（三指数共线、SUFH 18,891 行只报 4 行）；SBR/PAC 是工程基线，不是算法创新；证据门控/人补证据已被 EGCL/OpenMed/QCC 占。
-
----
-
-## 2. 阶段（S0–S4）
-
-| 阶段 | 目标 | 状态 |
-|---|---|---|
-| S0 问题定义 | 一句话 + 不做什么 | ✅ |
-| S1 证据底座 | 标签审计（5,401/48.9%、阈值 0.145→0.165/0.250） | ✅ |
-| S2 方法原型 | LARE + LAR-Policy 合成跑通（20 passed） | ✅ |
-| S3 真实数据 | MIMIC 472,290 行两标签实验 | ✅ |
-| S4 结论成稿 | 四张表 + 负结果 + 限制 | 🔄 |
-
-门禁：`python ~/.dsh/skills/complex-project-harness/scripts/preflight.py --config preflight.yaml`
+**明确裁撤与边界**：旧 H4 效用阈值 / H5 稀疏融合 / H6 CUGEW 已彻底裁撤并归档至 `docs/archive/`；裁撤 M2b 成对排序；遮蔽回填与事实纠正收归 Streamlit 软著原型（VoI 演示），不冒充真人医生实验；不重启科室层级床位调度。
 
 ---
 
-## 3. 一条链（不是并列 Demo）
+## 2. 端到端闭环流水线
 
 ```text
-MIMIC stay → 特征(19, charttime<intime+h) → 标签(12h, deathtime 优先)
-  → LightGBM p(s,h)（64 树/depth4/lr0.1, seed42）
-  → 动作：放行 / 复核 / 报警（双阈值）
-  → LARE：在两套标签下算 yield / 漏检 / 复核名单 Jaccard
-  → LAR-Policy：min max(cost_dod, cost_death) + 预算 K + 风险 α
-  → 结论：标签歧义是否改变评估；鲁棒策略的 max_regret
+MIMIC-IV v3.1（storetime <= t · 在院存活 · subject_id 60/20/20 · 精确 deathtime）
+  → LightGBM M0 → M1 → M2a（事件级 LSE+BCE 自定义 fobj）+ 概率校准（Brier / ECE）
+  → 动态复核队列（预算 K · D0 / D1 / D2 / D2-Dual）→ 事件级首次覆盖 / 提前时长 / Event-NNR
+  → 同源时间粗化（1h/6h/12h/日级）+ 多自由度 ε-近优共识/争议名单归因
+  → Streamlit 原型（SHAP→RAG→LLM · 带时间/来源的事实纠正与双快照留痕）
 ```
 
-**核心取舍**：漏报代价 4、误报 1、复核 0.2；复核+报警 ≤ K；放行漏检 ≤ α。
-
 ---
 
-## 4. 证据表（当前）
+## 3. 3 分钟答辩故事线
 
-| 结论 | 数字 | 证据 |
-|---|---|---|
-| dod 是粗化超集 | dod-only 5,401（48.9%）；基准率 1.19%→2.34% | `LABEL_AUDIT.md` |
-| 标签改变工作点 | 阈值 0.145→0.165/0.250；ΔPR-AUC −0.0174 | 同上 |
-| 同一策略两标签 yield | +0.0839（合成）；Jaccard 0.2429（MIMIC） | `artifacts/lare/` |
-| 鲁棒策略 | robust_cost 0.0708、max_regret 0.0039（MIMIC） | `artifacts/lare/mimic_lare.json` |
-| 数据不足不可行 | n=4000/α=5% radius≈0.0343 → infeasible | `PAC_SAFETY_NET.md` |
-
----
-
-## 5. 读者路径
-
-| 你是谁 | 先读 | 再读 |
-|---|---|---|
-| 非本领域/答辩 | [BRIEF.md](BRIEF.md)（分诊台类比 + 五步链路） | [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) |
-| 算法深挖 | [LARE.md](LARE.md) | [ARCHITECTURE_MATH.md](ARCHITECTURE_MATH.md) |
-| 数字/复现 | [STATUS.md](STATUS.md) | [DUMP_READY.md](DUMP_READY.md) |
-| 历史汇报稿 | [archive/FULL_REPORT.md](archive/FULL_REPORT.md) | 仅历史参考，口径以本文为准 |
-
----
-
-## 6. 3 分钟故事线
-
-1. **问题**：ICU 每小时只有少量复核名额，漏报代价远大于误报。
-2. **发现**：两套死亡日期记录（精确 vs 日期）会让同一复核策略看起来好坏完全不同。
-3. **做法**：LARE 在两套标签下评估；LAR-Policy 选“换标签也不至于太差”的阈值。
-4. **证据**：MIMIC 上 Jaccard 0.2429、robust_cost 0.0708、max_regret 0.0039。
-5. **边界**：单中心；不主张 SBR/PAC/H4/H5/H6 为创新；不写临床效果。
-
----
-
-## 7. 文档唯一入口
-
-| 类型 | 入口 |
-|---|---|
-| 总叙事 | 本文件 |
-| 人话版 | BRIEF.md |
-| 技术总览 | TECHNICAL_OVERVIEW.md |
-| 阶段门禁 | STAGE.md |
-| 方法/公式 | LARE.md |
-| 数字 | STATUS.md |
-| 历史 | archive/（保存不删） |
+1. **痛点**：ICU 医护复核精力稀缺，静态逐行风险打分既让同一危重患者反复占额，又使标准 LightGBM 浪费容量在已显性旧病例上，同时历史死亡记录的时间粗化会扭曲复核规则选择。
+2. **底座**：先补齐体征并封版严格因果底座（`storetime <= t`、在院过滤、`subject_id` 切分、去 `scale_pos_weight` 校准）。
+3. **三层创新**：用状态依赖队列补齐**决策层**；用解析梯度与凸 MM 海森的 M2a 自定义目标升级 **LightGBM 模型层**；用同源粗化 + 多自由度 $\varepsilon$-近优集合讲透**经管资源配置稳健性**。
+4. **验证与边界**：1,000 次患者级整组 Bootstrap 严格检验，事实纠正作为软著系统原型留痕，不夸大真人临床疗效。
