@@ -1,0 +1,8 @@
+data/
+**/data/
+**/cache/
+**/__pycache__/
+**/*.parquet
+**/logs/
+**/episodes/
+**/splits.json

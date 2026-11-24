@@ -55,3 +55,7 @@ $env:PYTHONPATH = (Get-Location)
 ```
 
 线下 dump 与 `artifacts/` **不入 Git**，遵守 [`docs/adr/001-layer-boundaries.md`](docs/adr/001-layer-boundaries.md) 分层边界。
+
+## Independent experiment archive
+
+See [experiments/README.md](experiments/README.md) for the repository-local algorithms, comparison results, reproduction steps and historical limitations.
